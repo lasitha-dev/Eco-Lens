@@ -20,6 +20,29 @@ Eco-Lens is a **mobile application** built with React Native and Expo, designed 
 -   **Database:** MongoDB
 -   **Version Control:** Git & GitHub
 
+## 📂 Folder Structure
+  
+
+```
+eco-lens/
+├── assets/              # Static assets like images, fonts, and icons
+│   ├── fonts/
+│   └── images/
+├── src/                 # Main source code directory
+│   ├── api/             # Functions for making API calls to the backend
+│   ├── components/      # Reusable, shared UI components (e.g., Button, Card, Input)
+│   ├── constants/       # App-wide constants (e.g., colors, theme styles, API endpoints)
+│   ├── hooks/           # Custom React hooks (e.g., useAuth, useApi)
+│   ├── navigation/      # React Navigation setup (stacks, tabs, and routing logic)
+│   ├── screens/         # Top-level screen components (e.g., HomeScreen, LoginScreen)
+│   ├── store/           # State management logic (e.g., Redux, Zustand, or Context)
+│   └── utils/           # Helper functions and utility scripts
+├── App.js               # The main entry point of the application
+├── babel.config.js      # Babel configuration
+├── package.json         # Project dependencies and scripts
+└── README.md            # You are here!
+```
+
 ## 🚀 Getting Started
 
 Follow these instructions to get the project running on your local machine for development.
