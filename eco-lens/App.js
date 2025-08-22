@@ -1,13 +1,21 @@
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
+// Login-specific imports
+import { NavigationContainer } from '@react-navigation/native';
+import { AuthProvider } from "./android/app/src/hooks/useAuthLogin";
+import AuthStack from './android/app/src/navigation/indexLogin'; 
+
+// 👉 App entry point
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <NavigationContainer>
+        <AuthStack />
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
 
