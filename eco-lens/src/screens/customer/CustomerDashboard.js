@@ -17,8 +17,10 @@ import {
   RefreshControl,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
+import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
@@ -35,11 +37,23 @@ const CustomerDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Handle product press
   const handleProductPress = useCallback((product) => {
-    // TODO: Navigate to product detail screen
-    console.log('Product pressed:', product.name);
+    setSelectedProduct(product);
+    setIsModalVisible(true);
+  }, []);
+
+  // Handle add to cart
+  const handleAddToCart = useCallback((product, quantity) => {
+    Alert.alert(
+      'Added to Cart',
+      `${quantity} × ${product.name} added to your cart!`,
+      [{ text: 'OK' }]
+    );
+    setIsModalVisible(false);
   }, []);
 
   // Handle refresh
@@ -271,6 +285,14 @@ const CustomerDashboard = () => {
           />
         }
         showsVerticalScrollIndicator={false}
+      />
+      
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        visible={isModalVisible}
+        product={selectedProduct}
+        onClose={() => setIsModalVisible(false)}
+        onAddToCart={handleAddToCart}
       />
     </SafeAreaView>
   );
