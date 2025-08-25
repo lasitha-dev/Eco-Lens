@@ -8,7 +8,11 @@ import {
   StatusBar,
 } from 'react-native';
 
-const WelcomeScreen = () => {
+const WelcomeScreen = ({ navigation }) => {
+  const handleGetStarted = () => {
+    navigation.navigate('Login');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -42,7 +46,7 @@ const WelcomeScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.getStartedButton}>
+        <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStarted}>
           <Text style={styles.getStartedText}>Get Started</Text>
         </TouchableOpacity>
       </View>
