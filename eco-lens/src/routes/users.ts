@@ -14,10 +14,10 @@ router.post('/register', async (req: Request, res: Response) => {
     await connectToDatabase();
     console.log('Database connected successfully');
     
-    const { fullName, email, password } = req.body;
+    const { firstName, lastName, email, dateOfBirth, address, country, password } = req.body;
 
     // Validate input
-    if (!fullName || !email || !password) {
+    if (!firstName || !lastName || !email || !dateOfBirth || !address || !country || !password) {
       console.log('Validation failed: Missing fields');
       return res.status(400).json({ 
         success: false, 
@@ -25,11 +25,40 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       console.log('Validation failed: Password too short');
       return res.status(400).json({ 
         success: false, 
-        message: 'Password must be at least 6 characters long' 
+        message: 'Password must be at least 8 characters long' 
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('Validation failed: Invalid email format');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please enter a valid email address' 
+      });
+    }
+
+    // Validate age (18+)
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    let actualAge = age;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      actualAge = age - 1;
+    }
+    
+    if (actualAge < 18) {
+      console.log('Validation failed: User too young');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You must be 18 years or older to register' 
       });
     }
 
@@ -47,8 +76,12 @@ router.post('/register', async (req: Request, res: Response) => {
     console.log('Creating new user...');
     // Create new user
     const user = new User({
-      fullName,
+      firstName,
+      lastName,
       email,
+      dateOfBirth: new Date(dateOfBirth),
+      address,
+      country,
       password, // In production, you should hash this password
     });
 
@@ -61,8 +94,12 @@ router.post('/register', async (req: Request, res: Response) => {
       message: 'User registered successfully',
       user: {
         id: user._id,
-        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
+        dateOfBirth: user.dateOfBirth,
+        address: user.address,
+        country: user.country,
         createdAt: user.createdAt,
       }
     });
@@ -114,8 +151,12 @@ router.post('/login', async (req: Request, res: Response) => {
       message: 'Login successful',
       user: {
         id: user._id,
-        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
+        dateOfBirth: user.dateOfBirth,
+        address: user.address,
+        country: user.country,
         createdAt: user.createdAt,
       }
     });
