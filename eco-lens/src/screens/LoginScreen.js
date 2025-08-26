@@ -1,22 +1,42 @@
+// src/screens/LoginScreen.js
+
 import React, { useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import Input from '../components/InputLogin'; // Updated reference
-import Button from '../components/ButtonLogin'; // Updated reference
-import { colors, spacing } from '../constants/themeLogin'; // Updated reference
+import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import Input from '../components/InputLogin';
+import Button from '../components/ButtonLogin';
+import { colors, spacing } from '../constants/themeLogin';
+import { mockLogin } from '../utils/mockLogin'; // Import the mock login function
+import { useAuth } from '../hooks/useAuthLogin'; // Import useAuth hook
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { setAuth } = useAuth(); // Get setAuth from the context
 
-  const handleLogin = () => {
-    // Placeholder: Replace with actual login logic later
-    console.log('Login attempted with:', { email, password });
-    // Navigate or show success once integrated with auth
+  const handleLogin = async () => {
+    setLoading(true);
+    setError(''); // Clear previous errors
+
+    try {
+      const { token, user } = await mockLogin(email, password);
+      // On successful mock login
+      await setAuth({ token, user });
+      console.log('Login successful! Token:', token);
+    } catch (err) {
+      // On failed mock login
+      setError(err.message);
+      console.log('Login failed:', err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login to Eco-Lens</Text>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <Input
         placeholder="Email"
         value={email}
@@ -32,7 +52,12 @@ const LoginScreen = ({ navigation }) => {
         secureTextEntry
         style={styles.input}
       />
-      <Button title="Login" onPress={handleLogin} />
+      <Button
+        title={loading ? 'Logging in...' : 'Login'}
+        onPress={handleLogin}
+        disabled={loading}
+      />
+      {loading && <ActivityIndicator size="small" color={colors.primary} />}
       <Text style={styles.link} onPress={() => navigation.navigate('Signup')}>
         Don't have an account? Sign up
       </Text>
@@ -44,7 +69,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: spacing.medium,
+    padding: spacing.large, // Increased padding
     backgroundColor: colors.background,
   },
   title: {
@@ -60,6 +85,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     textAlign: 'center',
     marginTop: spacing.medium,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: spacing.medium,
   },
 });
 
