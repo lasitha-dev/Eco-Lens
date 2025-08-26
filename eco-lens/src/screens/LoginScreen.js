@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import Input from '../components/InputLogin';
-import Button from '../components/ButtonLogin';
-import { colors, spacing } from '../constants/themeLogin'; // Assume these exist or create them
+import Input from '../components/InputLogin'; // Updated reference
+import Button from '../components/ButtonLogin'; // Updated reference
+import { colors, spacing } from '../constants/themeLogin'; // Updated reference
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');

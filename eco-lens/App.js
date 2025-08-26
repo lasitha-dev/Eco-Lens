@@ -4,8 +4,8 @@ import { StyleSheet } from 'react-native';
 
 // Login-specific imports
 import { NavigationContainer } from '@react-navigation/native';
-import { AuthProvider } from "./android/app/src/hooks/useAuthLogin";
-import AuthStack from './android/app/src/navigation/indexLogin'; 
+import { AuthProvider } from "./src/hooks/useAuthLogin";
+import AuthStack from './src/navigation/indexLogin'; 
 
 // 👉 App entry point
 export default function App() {
