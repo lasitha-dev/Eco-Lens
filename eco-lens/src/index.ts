@@ -54,11 +54,12 @@ app.get('/api/test-db', async (_req: Request, res: Response) => {
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 if (require.main === module) {
-  app.listen(port, () => {
-    console.log(`🚀 Server listening on http://localhost:${port}`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Server listening on http://0.0.0.0:${port}`);
     console.log(`📊 Health check: http://localhost:${port}/health`);
     console.log(`🔗 Database test: http://localhost:${port}/api/test-db`);
     console.log(`👥 User API: http://localhost:${port}/api/users`);
+    console.log(`📱 Mobile access: http://192.168.8.153:${port}`);
   });
 }
 

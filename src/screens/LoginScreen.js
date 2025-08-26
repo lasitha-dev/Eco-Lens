@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { api } from '../services/api';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -24,27 +25,35 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
-    if (!email.includes('@')) {
+    if (!email.includes('@') || !email.includes('.')) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
     
-    // Simulate login process
-    setTimeout(() => {
+    try {
+      // Call the real API
+      const result = await api.login({
+        email,
+        password,
+      });
+
       setIsLoading(false);
-      // For now, just show success and navigate to main app
       Alert.alert('Success', 'Login successful!', [
         {
           text: 'OK',
           onPress: () => {
             // Navigate to main app screen (you can create this later)
             console.log('Navigate to main app');
+            console.log('User logged in:', result.user);
           }
         }
       ]);
-    }, 1500);
+    } catch (error) {
+      setIsLoading(false);
+      Alert.alert('Error', error.message || 'Login failed. Please check your credentials.');
+    }
   };
 
   const handleRegister = () => {

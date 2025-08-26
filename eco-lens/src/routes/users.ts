@@ -6,13 +6,19 @@ const router = express.Router();
 
 // Register new user
 router.post('/register', async (req: Request, res: Response) => {
+  console.log('=== SERVER: Registration request received ===');
+  console.log('Request body:', req.body);
+  console.log('Request headers:', req.headers);
+  
   try {
     await connectToDatabase();
+    console.log('Database connected successfully');
     
     const { fullName, email, password } = req.body;
 
     // Validate input
     if (!fullName || !email || !password) {
+      console.log('Validation failed: Missing fields');
       return res.status(400).json({ 
         success: false, 
         message: 'All fields are required' 
@@ -20,21 +26,25 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     if (password.length < 6) {
+      console.log('Validation failed: Password too short');
       return res.status(400).json({ 
         success: false, 
         message: 'Password must be at least 6 characters long' 
       });
     }
 
+    console.log('Checking if user already exists...');
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('User already exists:', email);
       return res.status(400).json({ 
         success: false, 
         message: 'User with this email already exists' 
       });
     }
 
+    console.log('Creating new user...');
     // Create new user
     const user = new User({
       fullName,
@@ -42,7 +52,9 @@ router.post('/register', async (req: Request, res: Response) => {
       password, // In production, you should hash this password
     });
 
+    console.log('Saving user to database...');
     await user.save();
+    console.log('User saved successfully:', user._id);
 
     res.status(201).json({
       success: true,
@@ -56,7 +68,8 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('=== SERVER: Registration error ===');
+    console.error('Error details:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 

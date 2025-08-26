@@ -6,11 +6,22 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  Alert,
 } from 'react-native';
+import { api } from '../services/api';
 
 const WelcomeScreen = ({ navigation }) => {
   const handleGetStarted = () => {
     navigation.navigate('Login');
+  };
+
+  const testConnection = async () => {
+    try {
+      const result = await api.testConnection();
+      Alert.alert('Connection Test', `Success! Server is running.\nStatus: ${result.status}\nMessage: ${result.message}`);
+    } catch (error) {
+      Alert.alert('Connection Test', `Failed to connect to server.\nError: ${error.message}`);
+    }
   };
 
   return (
@@ -45,6 +56,10 @@ const WelcomeScreen = ({ navigation }) => {
             <Text style={styles.featureText}>Personal Sustainability Goals</Text>
           </View>
         </View>
+
+        <TouchableOpacity style={styles.testConnectionButton} onPress={testConnection}>
+          <Text style={styles.testConnectionText}>Test Server Connection</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStarted}>
           <Text style={styles.getStartedText}>Get Started</Text>
@@ -121,6 +136,19 @@ const styles = StyleSheet.create({
     color: '#2E7D32',
     fontWeight: '500',
     flex: 1,
+  },
+  testConnectionButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  testConnectionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   getStartedButton: {
     backgroundColor: '#4CAF50',

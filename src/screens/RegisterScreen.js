@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { api } from '../services/api';
 
 const RegisterScreen = ({ navigation }) => {
   const [fullName, setFullName] = useState('');
@@ -20,31 +21,69 @@ const RegisterScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const testNetwork = async () => {
+    console.log('HI - Test Network button pressed!');
+    try {
+      console.log('=== NETWORK TEST ===');
+      const response = await fetch('http://192.168.8.153:4000/health');
+      const data = await response.json();
+      console.log('Network test successful:', data);
+      Alert.alert('Network Test', 'Success! Server is reachable from mobile app.');
+    } catch (error) {
+      console.log('Network test failed:', error);
+      Alert.alert('Network Test', `Failed: ${error.message}`);
+    }
+  };
+
   const handleRegister = async () => {
+    console.log('=== REGISTRATION START ===');
+    console.log('HI - This is the RegisterScreen handleRegister function!');
+    console.log('Form data:', { fullName, email, password, confirmPassword });
+    
     if (!fullName || !email || !password || !confirmPassword) {
+      console.log('Validation failed: Missing fields');
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     if (!email.includes('@')) {
+      console.log('Validation failed: Invalid email');
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     if (password.length < 6) {
+      console.log('Validation failed: Password too short');
       Alert.alert('Error', 'Password must be at least 6 characters long');
       return;
     }
 
     if (password !== confirmPassword) {
+      console.log('Validation failed: Passwords do not match');
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
+    console.log('Validation passed, calling API...');
     setIsLoading(true);
     
-    // Simulate registration process
-    setTimeout(() => {
+    try {
+      // First, test basic connectivity
+      console.log('Testing basic connectivity...');
+      const testResponse = await fetch('http://192.168.8.153:4000/health');
+      console.log('Connectivity test status:', testResponse.status);
+      const testData = await testResponse.json();
+      console.log('Connectivity test data:', testData);
+      
+      console.log('Making API call to register user...');
+      // Call the real API
+      const result = await api.register({
+        fullName,
+        email,
+        password,
+      });
+
+      console.log('API call successful:', result);
       setIsLoading(false);
       Alert.alert('Success', 'Account created successfully!', [
         {
@@ -54,7 +93,13 @@ const RegisterScreen = ({ navigation }) => {
           }
         }
       ]);
-    }, 1500);
+    } catch (error) {
+      console.log('API call failed:', error);
+      console.log('Error message:', error.message);
+      console.log('Error stack:', error.stack);
+      setIsLoading(false);
+      Alert.alert('Error', error.message || 'Registration failed. Please try again.');
+    }
   };
 
   return (
@@ -122,6 +167,13 @@ const RegisterScreen = ({ navigation }) => {
                 autoCapitalize="none"
               />
             </View>
+
+            <TouchableOpacity 
+              style={styles.testButton}
+              onPress={testNetwork}
+            >
+              <Text style={styles.testButtonText}>Test Network Connection</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
@@ -227,6 +279,19 @@ const styles = StyleSheet.create({
   },
   registerButtonDisabled: {
     backgroundColor: '#A5D6A7',
+  },
+  testButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  testButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   registerButtonText: {
     color: '#ffffff',
