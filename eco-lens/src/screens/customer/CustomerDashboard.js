@@ -114,32 +114,9 @@ const CustomerDashboard = () => {
     return filtered;
   }, [products, searchQuery, selectedCategory, selectedSort, selectedFilter]);
 
-  // Render header component
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      {/* App Title */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>🌿 Eco-Lens</Text>
-        <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search eco-friendly products..."
-          placeholderTextColor={theme.colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Text style={styles.clearIcon}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
+  // Render filters header component (categories, filters, controls)
+  const renderFiltersHeader = useCallback(() => (
+    <View style={styles.filtersContainer}>
       {/* Categories */}
       <ScrollView 
         horizontal 
@@ -230,7 +207,7 @@ const CustomerDashboard = () => {
         </View>
       </View>
     </View>
-  );
+  ), [selectedCategory, selectedFilter, filteredProducts.length, isListView]);
 
   // Render empty state
   const renderEmptyState = () => (
@@ -260,6 +237,35 @@ const CustomerDashboard = () => {
         backgroundColor={theme.colors.background}
       />
       
+      {/* Fixed Header with Search - Outside of FlatList */}
+      <View style={styles.fixedHeader}>
+        {/* App Title */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>🌿 Eco-Lens</Text>
+          <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            key="search-input"
+            style={styles.searchInput}
+            placeholder="Search eco-friendly products..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={styles.clearIcon}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      
       <FlatList
         data={filteredProducts}
         renderItem={({ item }) => (
@@ -274,7 +280,7 @@ const CustomerDashboard = () => {
         key={isListView ? 'list' : 'grid'}
         columnWrapperStyle={!isListView && styles.gridRow}
         contentContainerStyle={styles.productList}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderFiltersHeader}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
@@ -304,13 +310,22 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   
-  headerContainer: {
+  fixedHeader: {
     backgroundColor: theme.colors.surface,
     paddingTop: theme.spacing.m,
-    marginBottom: theme.spacing.m,
+    paddingBottom: theme.spacing.m,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.medium,
+  },
+  
+  filtersContainer: {
+    backgroundColor: theme.colors.surface,
+    paddingVertical: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    borderBottomLeftRadius: theme.borderRadius.xl,
+    borderBottomRightRadius: theme.borderRadius.xl,
+    ...theme.shadows.small,
   },
   
   titleContainer: {

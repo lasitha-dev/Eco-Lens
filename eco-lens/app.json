@@ -1,7 +1,38 @@
 {
   "expo": {
-    "name": "eco-lens",
+    "name": "Eco-Lens",
     "slug": "eco-lens",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E7D32"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ecolens.app"
+    },
+    "android": {
+      "package": "com.ecolens.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2E7D32"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7a2a0fe2-ca55-4529-8eff-888d2cc29713"
+      }
+    }
   }
 }
