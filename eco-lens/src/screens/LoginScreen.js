@@ -11,7 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
+import AuthService from '../api/authService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,10 +21,19 @@ const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    // TODO: Implement login logic
-    console.log('Login:', { email, password });
-    navigation.navigate('Home');
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    try {
+      const result = await AuthService.loginUser(email, password);
+      console.log('Login successful:', result);
+      navigation.navigate('Home');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Login failed. Please try again.');
+    }
   };
 
   return (
