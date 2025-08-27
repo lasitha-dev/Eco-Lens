@@ -1,8 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { colors } from '../constants/colors';
+import { useAuth } from '../hooks/useAuthLogin';
 
 const HomeScreen = ({ navigation }) => {
+  const { setAuth } = useAuth();
+
+  const handleLogout = async () => {
+    // Clear the auth state and token from AsyncStorage
+    await setAuth(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -29,6 +37,13 @@ const HomeScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('Welcome')}
         >
           <Text style={styles.buttonText}>Back to Welcome</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.logoutButton]}
+          onPress={handleLogout}
+        >
+          <Text style={styles.buttonText}>Logout</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -93,6 +108,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 20,
   },
+  logoutButton: {
+    backgroundColor: '#FF6B6B',
+    marginTop: 10,
+  },
   buttonText: {
     color: colors.textLight,
     fontSize: 16,
@@ -101,5 +120,3 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
-
-

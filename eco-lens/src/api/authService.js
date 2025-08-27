@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.8.153:5001/api';
+const API_BASE_URL = 'http://192.168.101.96:5001/api';
 
 class AuthService {
   // Check if email already exists

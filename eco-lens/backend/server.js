@@ -14,12 +14,25 @@ app.use(express.json());
 // MongoDB Connection
 const MONGODB_URL = 'mongodb+srv://pramod:Pramod25@wijeboytechnology.rlmu075.mongodb.net/?retryWrites=true&w=majority&appName=Wijeboytechnology';
 
+let isMongoConnected = false;
+
 mongoose.connect(MONGODB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => {
+  console.log('Connected to MongoDB');
+  isMongoConnected = true;
+})
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  console.log('Server will continue without database - using in-memory storage for demo');
+  isMongoConnected = false;
+});
+
+// In-memory storage for demo purposes when MongoDB is not available
+let inMemoryUsers = [];
+let userIdCounter = 1;
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -102,7 +115,13 @@ app.post('/api/check-email', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    let existingUser;
+    if (isMongoConnected) {
+      existingUser = await User.findOne({ email: email.toLowerCase() });
+    } else {
+      existingUser = inMemoryUsers.find(user => user.email === email.toLowerCase());
+    }
+    
     res.json({ exists: !!existingUser });
   } catch (error) {
     console.error('Error checking email:', error);
@@ -129,7 +148,13 @@ app.post('/api/register', async (req, res) => {
     }
 
     // Check if email already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    let existingUser;
+    if (isMongoConnected) {
+      existingUser = await User.findOne({ email: email.toLowerCase() });
+    } else {
+      existingUser = inMemoryUsers.find(user => user.email === email.toLowerCase());
+    }
+    
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
@@ -141,8 +166,8 @@ app.post('/api/register', async (req, res) => {
 
     // Validate password
     if (!validatePassword(password)) {
-      return res.status(400).json({ 
-        error: 'Password must contain uppercase letter, number, special character, and be at least 8 characters' 
+      return res.status(400).json({
+        error: 'Password must contain uppercase letter, number, special character, and be at least 8 characters'
       });
     }
 
@@ -150,18 +175,34 @@ app.post('/api/register', async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new user
-    const newUser = new User({
-      firstName,
-      lastName,
-      email: email.toLowerCase(),
-      address,
-      dateOfBirth: new Date(dateOfBirth),
-      country,
-      password: hashedPassword
-    });
-
-    await newUser.save();
+    let newUser;
+    if (isMongoConnected) {
+      // Create new user in MongoDB
+      newUser = new User({
+        firstName,
+        lastName,
+        email: email.toLowerCase(),
+        address,
+        dateOfBirth: new Date(dateOfBirth),
+        country,
+        password: hashedPassword
+      });
+      await newUser.save();
+    } else {
+      // Create new user in memory
+      newUser = {
+        _id: userIdCounter++,
+        firstName,
+        lastName,
+        email: email.toLowerCase(),
+        address,
+        dateOfBirth: new Date(dateOfBirth),
+        country,
+        password: hashedPassword,
+        createdAt: new Date()
+      };
+      inMemoryUsers.push(newUser);
+    }
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -193,7 +234,13 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Find user by email
-    const user = await User.findOne({ email: email.toLowerCase() });
+    let user;
+    if (isMongoConnected) {
+      user = await User.findOne({ email: email.toLowerCase() });
+    } else {
+      user = inMemoryUsers.find(u => u.email === email.toLowerCase());
+    }
+    
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -206,6 +253,7 @@ app.post('/api/login', async (req, res) => {
 
     res.json({
       message: 'Login successful',
+      token: 'demo-token-' + Date.now(), // Simple token for demo
       user: {
         id: user._id,
         firstName: user.firstName,
