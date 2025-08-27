@@ -242,7 +242,7 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your email"
-                    placeholderTextColor="#81C784"
+                    placeholderTextColor="#9E9E9E"
                     value={email}
                     onChangeText={setEmail}
                     onFocus={() => setEmailFocused(true)}
@@ -273,7 +273,7 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your password"
-                    placeholderTextColor="#81C784"
+                    placeholderTextColor="#9E9E9E"
                     value={password}
                     onChangeText={setPassword}
                     onFocus={() => setPasswordFocused(true)}
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#1B5E20',
+    backgroundColor: 'rgba(132, 200, 137, 1)',
   },
   backgroundCircle1: {
     position: 'absolute',
@@ -519,19 +519,19 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#66BB6A',
+    fontWeight: '700',
+    color: '#2E7D32',
     marginBottom: 4,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   inputLabelFocused: {
-    color: '#2E7D32',
+    color: '#0D4E12',
   },
   input: {
     fontSize: 16,
-    color: '#1B5E20',
-    fontWeight: '500',
+    color: '#0D4E12',
+    fontWeight: '600',
     paddingVertical: 4,
   },
   eyeButton: {
@@ -543,15 +543,16 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   forgotPassword: {
-    alignSelf: 'flex-end',
+    alignSelf: 'center',
     marginBottom: 28,
     paddingVertical: 8,
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#2E7D32',
-    fontWeight: '600',
+    color: '#1B5E20',
+    fontWeight: '700',
     letterSpacing: 0.3,
+    textAlign: 'center',
   },
   loginButton: {
     position: 'relative',

@@ -5,10 +5,14 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [auth, setAuth] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadAuth = async () => {
       try {
+        // Add a delay to show splash screen
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
         const token = await AsyncStorage.getItem('authToken');
         const userData = await AsyncStorage.getItem('userData');
         if (token && userData) {
@@ -19,6 +23,8 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Error loading auth data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadAuth();
@@ -41,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ auth, setAuth: updateAuth }}>
+    <AuthContext.Provider value={{ auth, setAuth: updateAuth, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
