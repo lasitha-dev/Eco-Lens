@@ -3,7 +3,6 @@ import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
-import AuthStack from './src/navigation/indexLogin';
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Simple loading splash component
@@ -20,7 +19,7 @@ const LoadingSplash = () => {
 
 // A component to handle the navigation logic based on auth state
 const Navigation = () => {
-  const { auth, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   
   if (isLoading) {
     return <LoadingSplash />;
@@ -28,7 +27,7 @@ const Navigation = () => {
   
   return (
     <NavigationContainer>
-      {auth ? <AppNavigator /> : <AuthStack />}
+      <AppNavigator />
       <StatusBar style="auto" />
     </NavigationContainer>
   );

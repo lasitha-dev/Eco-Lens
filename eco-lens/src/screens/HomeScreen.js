@@ -1,14 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { colors } from '../constants/colors';
 import { useAuth } from '../hooks/useAuthLogin';
 
 const HomeScreen = ({ navigation }) => {
-  const { setAuth } = useAuth();
+  const { auth, setAuth } = useAuth();
+
+  // Protect this screen - redirect to Welcome if not authenticated
+  useEffect(() => {
+    if (!auth) {
+      navigation.navigate('Welcome');
+    }
+  }, [auth, navigation]);
 
   const handleLogout = async () => {
     // Clear the auth state and token from AsyncStorage
     await setAuth(null);
+    // Navigate back to Welcome screen after logout
+    navigation.navigate('Welcome');
   };
 
   return (
@@ -34,9 +43,9 @@ const HomeScreen = ({ navigation }) => {
         
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Welcome')}
+          onPress={() => navigation.navigate('AdminDashboard')}
         >
-          <Text style={styles.buttonText}>Back to Welcome</Text>
+          <Text style={styles.buttonText}>Admin Dashboard</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
