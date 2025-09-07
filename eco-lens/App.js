@@ -1,21 +1,44 @@
-import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer } from '@react-navigation/native';
+import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
+import AuthStack from './src/navigation/indexLogin';
+import AppNavigator from './src/navigation/AppNavigator';
 
-export default function App() {
+// Simple loading splash component
+const LoadingSplash = () => {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
+    <View style={{ flex: 1, backgroundColor: '#1B5E20', justifyContent: 'center', alignItems: 'center' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#1B5E20" />
+      <Text style={{ fontSize: 70, marginBottom: 20 }}>🌱</Text>
+      <Text style={{ fontSize: 42, fontWeight: 'bold', color: '#FFFFFF', letterSpacing: 2 }}>Eco-Lens</Text>
+      <Text style={{ fontSize: 18, color: 'rgba(255, 255, 255, 0.9)', marginTop: 8 }}>Sustainable Shopping Assistant</Text>
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+// A component to handle the navigation logic based on auth state
+const Navigation = () => {
+  const { auth, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <LoadingSplash />;
+  }
+  
+  return (
+    <NavigationContainer>
+      {auth ? <AppNavigator /> : <AuthStack />}
+      <StatusBar style="auto" />
+    </NavigationContainer>
+  );
+};
+
+// The main App entry point
+export default function App() {
+  return (
+    <AuthProvider>
+      <Navigation />
+    </AuthProvider>
+  );
+}
