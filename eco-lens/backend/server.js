@@ -4,6 +4,9 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 require('dotenv').config();
 
+const User = require('./models/User');
+const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -34,53 +37,6 @@ mongoose.connect(MONGODB_URL, {
 let inMemoryUsers = [];
 let userIdCounter = 1;
 
-// User Schema
-const userSchema = new mongoose.Schema({
-  firstName: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2
-  },
-  lastName: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true,
-    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please enter a valid email']
-  },
-  address: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  dateOfBirth: {
-    type: Date,
-    required: true
-  },
-  country: {
-    type: String,
-    required: true
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 8
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const User = mongoose.model('User', userSchema);
 
 // Validation middleware
 const validateAge = (dateOfBirth) => {
@@ -283,6 +239,9 @@ app.get('/api/users', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// Forgot Password Routes
+app.use('/api/auth', forgotPasswordRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

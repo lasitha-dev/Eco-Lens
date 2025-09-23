@@ -15,19 +15,19 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
-import AuthService from '../api/authService';
-import { useAuth } from '../hooks/useAuthLogin';
 
 const { width, height } = Dimensions.get('window');
 
-const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const ResetPasswordScreen = ({ navigation, route }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const { setAuth } = useAuth();
+  const [newPasswordFocused, setNewPasswordFocused] = useState(false);
+  const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const token = route?.params?.token || '';
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -77,21 +77,41 @@ const LoginScreen = ({ navigation }) => {
     return () => pulseAnimation.stop();
   }, []);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing Information', 'Please enter both email and password to continue.');
+  const validatePassword = (password) => {
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const isLongEnough = password.length >= 8;
+
+    return hasUpperCase && hasNumber && hasSpecialChar && isLongEnough;
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      Alert.alert('Missing Information', 'Please fill in both password fields.');
       return;
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Password Mismatch', 'Passwords do not match. Please try again.');
+      return;
+    }
+
+    if (!validatePassword(newPassword)) {
+      Alert.alert(
+        'Invalid Password',
+        'Password must contain uppercase letter, number, special character, and be at least 8 characters.'
+      );
+      return;
+    }
+
+    if (!token) {
+      Alert.alert('Invalid Link', 'Reset token is missing. Please request a new reset link.');
       return;
     }
 
     setLoading(true);
-    
+
     // Success animation
     Animated.sequence([
       Animated.timing(logoRotate, {
@@ -107,27 +127,35 @@ const LoginScreen = ({ navigation }) => {
     ]).start();
 
     try {
-      const result = await AuthService.loginUser(email, password);
-      console.log('Login successful:', result);
-      
-      // Set auth context with the result
-      await setAuth({ 
-        token: result.token, 
-        user: result.user 
+      // Call API to reset password
+      const response = await fetch('http://localhost:5002/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to reset password');
+      }
+
+      const data = await response.json();
+      Alert.alert(
+        'Password Reset Successful',
+        'Your password has been reset successfully. You can now log in with your new password.',
+        [{ text: 'Go to Login', onPress: () => navigation.navigate('Login') }]
+      );
     } catch (error) {
       Alert.alert(
-        'Login Failed', 
-        error.message || 'Unable to sign in. Please check your credentials and try again.',
+        'Error',
+        error.message || 'Unable to reset password. Please try again.',
         [{ text: 'Try Again', style: 'default' }]
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleForgotPassword = () => {
-    navigation.navigate('ForgotPassword');
   };
 
   const logoRotateInterpolate = logoRotate.interpolate({
@@ -138,24 +166,24 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
-      
+
       {/* Animated Background */}
       <View style={styles.backgroundGradient}>
         <Animated.View style={[styles.backgroundCircle1, { opacity: fadeAnim }]} />
         <Animated.View style={[styles.backgroundCircle2, { opacity: fadeAnim }]} />
       </View>
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <Animated.View 
+          <Animated.View
             style={[
               styles.header,
               {
@@ -164,7 +192,7 @@ const LoginScreen = ({ navigation }) => {
               }
             ]}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
               activeOpacity={0.8}
@@ -174,7 +202,7 @@ const LoginScreen = ({ navigation }) => {
           </Animated.View>
 
           {/* Logo and Welcome Section */}
-          <Animated.View 
+          <Animated.View
             style={[
               styles.brandingSection,
               {
@@ -193,26 +221,26 @@ const LoginScreen = ({ navigation }) => {
               </View>
               <View style={styles.logoGlow} />
             </View>
-            <Animated.Text 
+            <Animated.Text
               style={[
                 styles.welcomeText,
                 { transform: [{ translateY: slideAnim }] }
               ]}
             >
-              Welcome Back
+              New Password
             </Animated.Text>
-            <Animated.Text 
+            <Animated.Text
               style={[
                 styles.subtitle,
                 { transform: [{ translateY: slideAnim }] }
               ]}
             >
-              Continue your eco-friendly journey
+              Enter your new password below
             </Animated.Text>
           </Animated.View>
 
-          {/* Login Form Card */}
-          <Animated.View 
+          {/* Form Card */}
+          <Animated.View
             style={[
               styles.formCard,
               {
@@ -221,93 +249,89 @@ const LoginScreen = ({ navigation }) => {
               }
             ]}
           >
-            {/* Email Input */}
+            {/* New Password Input */}
             <View style={styles.inputContainer}>
               <Animated.View style={[
                 styles.inputWrapper,
-                emailFocused && styles.inputWrapperFocused,
-                email && styles.inputWrapperFilled
-              ]}>
-                <View style={styles.inputIconContainer}>
-                  <Text style={styles.inputIcon}>✉️</Text>
-                </View>
-                <View style={styles.inputContent}>
-                  <Text style={[styles.inputLabel, emailFocused && styles.inputLabelFocused]}>
-                    Email Address
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your email"
-                    placeholderTextColor="#9E9E9E"
-                    value={email}
-                    onChangeText={setEmail}
-                    onFocus={() => setEmailFocused(true)}
-                    onBlur={() => setEmailFocused(false)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                  />
-                </View>
-              </Animated.View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Animated.View style={[
-                styles.inputWrapper,
-                passwordFocused && styles.inputWrapperFocused,
-                password && styles.inputWrapperFilled
+                newPasswordFocused && styles.inputWrapperFocused,
+                newPassword && styles.inputWrapperFilled
               ]}>
                 <View style={styles.inputIconContainer}>
                   <Text style={styles.inputIcon}>🔐</Text>
                 </View>
                 <View style={styles.inputContent}>
-                  <Text style={[styles.inputLabel, passwordFocused && styles.inputLabelFocused]}>
-                    Password
+                  <Text style={[styles.inputLabel, newPasswordFocused && styles.inputLabelFocused]}>
+                    New Password
                   </Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your password"
+                    placeholder="Enter new password"
                     placeholderTextColor="#9E9E9E"
-                    value={password}
-                    onChangeText={setPassword}
-                    onFocus={() => setPasswordFocused(true)}
-                    onBlur={() => setPasswordFocused(false)}
-                    secureTextEntry={!showPassword}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    onFocus={() => setNewPasswordFocused(true)}
+                    onBlur={() => setNewPasswordFocused(false)}
+                    secureTextEntry={!showNewPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    autoComplete="password"
                   />
                 </View>
                 <TouchableOpacity
                   style={styles.eyeButton}
-                  onPress={() => setShowPassword(!showPassword)}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  <Text style={styles.eyeIcon}>{showNewPassword ? '👁️' : '👁️‍🗨️'}</Text>
                 </TouchableOpacity>
               </Animated.View>
             </View>
 
-            {/* Forgot Password */}
-            <TouchableOpacity 
-              style={styles.forgotPassword}
-              onPress={handleForgotPassword}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-            </TouchableOpacity>
+            {/* Confirm Password Input */}
+            <View style={styles.inputContainer}>
+              <Animated.View style={[
+                styles.inputWrapper,
+                confirmPasswordFocused && styles.inputWrapperFocused,
+                confirmPassword && styles.inputWrapperFilled
+              ]}>
+                <View style={styles.inputIconContainer}>
+                  <Text style={styles.inputIcon}>🔒</Text>
+                </View>
+                <View style={styles.inputContent}>
+                  <Text style={[styles.inputLabel, confirmPasswordFocused && styles.inputLabelFocused]}>
+                    Confirm Password
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm new password"
+                    placeholderTextColor="#9E9E9E"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    onFocus={() => setConfirmPasswordFocused(true)}
+                    onBlur={() => setConfirmPasswordFocused(false)}
+                    secureTextEntry={!showConfirmPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
 
-            {/* Sign In Button */}
+            {/* Reset Button */}
             <TouchableOpacity
               style={[
                 styles.loginButton,
                 loading && styles.loginButtonLoading,
-                (!email || !password) && styles.loginButtonDisabled
+                (!newPassword || !confirmPassword) && styles.loginButtonDisabled
               ]}
-              onPress={handleLogin}
-              disabled={loading || !email || !password}
+              onPress={handleResetPassword}
+              disabled={loading || !newPassword || !confirmPassword}
               activeOpacity={0.9}
             >
               <View style={styles.buttonContent}>
@@ -315,15 +339,15 @@ const LoginScreen = ({ navigation }) => {
                   <ActivityIndicator size="small" color="#FFFFFF" style={styles.loadingIcon} />
                 )}
                 <Text style={styles.loginButtonText}>
-                  {loading ? 'Signing In...' : 'Sign In'}
+                  {loading ? 'Resetting...' : 'Reset Password'}
                 </Text>
               </View>
               <View style={styles.buttonGlow} />
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Sign Up Link */}
-          <Animated.View 
+          {/* Back to Login */}
+          <Animated.View
             style={[
               styles.signUpSection,
               {
@@ -332,12 +356,11 @@ const LoginScreen = ({ navigation }) => {
               }
             ]}
           >
-            <Text style={styles.signUpText}>Don't have an account? </Text>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('SignUp')}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
               activeOpacity={0.7}
             >
-              <Text style={styles.signUpLink}>Create Account</Text>
+              <Text style={styles.signUpLink}>Back to Login</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
@@ -538,18 +561,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     opacity: 0.7,
   },
-  forgotPassword: {
-    alignSelf: 'center',
-    marginBottom: 28,
-    paddingVertical: 8,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: '#1B5E20',
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-  },
   loginButton: {
     position: 'relative',
     backgroundColor: '#4CAF50',
@@ -614,4 +625,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default ResetPasswordScreen;

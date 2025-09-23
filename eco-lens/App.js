@@ -21,11 +21,11 @@ const LoadingSplash = () => {
 // A component to handle the navigation logic based on auth state
 const Navigation = () => {
   const { auth, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return <LoadingSplash />;
   }
-  
+
   return (
     <NavigationContainer>
       {auth ? <AppNavigator /> : <AuthStack />}
