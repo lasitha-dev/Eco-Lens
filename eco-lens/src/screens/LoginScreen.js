@@ -115,6 +115,9 @@ const LoginScreen = ({ navigation }) => {
         token: result.token, 
         user: result.user 
       });
+      
+      // Navigate to Home screen after successful login
+      navigation.navigate('Home');
     } catch (error) {
       Alert.alert(
         'Login Failed', 
