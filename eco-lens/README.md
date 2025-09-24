@@ -51,8 +51,10 @@ npm install
 #### Environment Variables
 Create a `.env` file in the backend directory:
 ```env
-PORT=5000
-MONGODB_URI=mongodb+srv://pramod:Pramod25@wijeboytechnology.rlmu075.mongodb.net/?retryWrites=true&w=majority&appName=Wijeboytechnology
+PORT=5002
+MONGODB_URI=mongodb+srv://pramod:Pramod25@wijeboytechnology.rlmu075.mongodb.net/ecolens?retryWrites=true&w=majority&appName=Wijeboytechnology
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
 ```
 
 #### Start Backend Server
@@ -62,7 +64,7 @@ npm start
 npm run dev
 ```
 
-The backend will run on `http://localhost:5000`
+The backend will run on `http://localhost:5002`
 
 ### 3. Frontend Setup
 
@@ -152,7 +154,7 @@ The app uses percentage-based layouts that adapt to different screen sizes:
 ## Development Notes
 
 ### Backend API URL
-The frontend is configured to connect to `http://localhost:5000/api`. For production, update the `API_BASE_URL` in `src/api/authService.js`.
+The frontend is configured to connect to the API URL defined in the environment variable `API_URL`. For development, this should be set to `http://localhost:5002/api` in your `.env` file.
 
 ### MongoDB Connection
 The app uses MongoDB Atlas. Ensure your IP address is whitelisted in the MongoDB Atlas dashboard.
@@ -166,7 +168,7 @@ The app uses MongoDB Atlas. Ensure your IP address is whitelisted in the MongoDB
 
 ### Common Issues
 
-1. **Connection Refused**: Ensure backend server is running on port 5000
+1. **Connection Refused**: Ensure backend server is running on port 5002
 2. **MongoDB Connection Error**: Check your MongoDB Atlas connection string and IP whitelist
 3. **Expo Go Issues**: Make sure your phone and computer are on the same WiFi network
 4. **Validation Errors**: Check that all required fields are filled and meet validation criteria

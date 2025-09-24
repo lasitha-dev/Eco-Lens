@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 // Replace this with your actual back-end server URL
-const API_URL = 'http://your-server-ip-or-domain:5000/api/auth';
+const API_URL = API_BASE_URL;
 
 export const login = async (email, password) => {
   try {

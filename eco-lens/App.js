@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
 import AuthStack from './src/navigation/indexLogin';

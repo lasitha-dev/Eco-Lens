@@ -1,9 +1,12 @@
-const API_BASE_URL = 'http://192.168.101.96:5001/api';
+import { API_BASE_URL } from '../config/api';
+import { showNetworkTroubleshootingTips } from '../utils/networkUtils';
 
 class AuthService {
   // Check if email already exists
   static async checkEmailExists(email) {
     try {
+      console.log(`Checking email at: ${API_BASE_URL}/check-email`);
+      
       const response = await fetch(`${API_BASE_URL}/check-email`, {
         method: 'POST',
         headers: {
@@ -20,6 +23,13 @@ class AuthService {
       return data.exists;
     } catch (error) {
       console.error('Error checking email:', error);
+      
+      // Provide helpful network troubleshooting info
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection and ensure your device and computer are on the same WiFi network.');
+      }
+      
       throw new Error('Failed to check email availability');
     }
   }
@@ -27,6 +37,8 @@ class AuthService {
   // Register new user
   static async registerUser(userData) {
     try {
+      console.log(`Registering user at: ${API_BASE_URL}/register`);
+      
       const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
@@ -52,6 +64,13 @@ class AuthService {
       return data;
     } catch (error) {
       console.error('Error registering user:', error);
+      
+      // Provide helpful network troubleshooting info
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection and ensure your device and computer are on the same WiFi network.');
+      }
+      
       throw error;
     }
   }
@@ -59,6 +78,8 @@ class AuthService {
   // Login user
   static async loginUser(email, password) {
     try {
+      console.log(`Logging in user at: ${API_BASE_URL}/login`);
+      
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
@@ -76,6 +97,13 @@ class AuthService {
       return data;
     } catch (error) {
       console.error('Error logging in:', error);
+      
+      // Provide helpful network troubleshooting info
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection and ensure your device and computer are on the same WiFi network.');
+      }
+      
       throw error;
     }
   }
