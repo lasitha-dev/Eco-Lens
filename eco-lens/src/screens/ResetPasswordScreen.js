@@ -15,6 +15,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
+import { API_BASE_URL } from '../config/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -128,7 +129,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
 
     try {
       // Call API to reset password
-      const response = await fetch('http://localhost:5002/api/auth/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

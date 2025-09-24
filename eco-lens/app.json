@@ -32,7 +32,10 @@
     "extra": {
       "eas": {
         "projectId": "7a2a0fe2-ca55-4529-8eff-888d2cc29713"
-      }
+      },
+      "apiUrl": "http://localhost:5002/api",
+      "apiPort": "5002",
+      "mobileApiUrl": "http://10.38.245.146:5002/api"
     },
     "scheme": "eco-lens"
   }

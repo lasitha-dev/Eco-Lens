@@ -8,28 +8,38 @@ const User = require('./models/User');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5002;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const MONGODB_URL = 'mongodb+srv://pramod:Pramod25@wijeboytechnology.rlmu075.mongodb.net/?retryWrites=true&w=majority&appName=Wijeboytechnology';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is required');
+  process.exit(1);
+}
+
+console.log('Attempting to connect to MongoDB...');
+console.log('MongoDB URI (partial):', MONGODB_URI.substring(0, 50) + '...');
 
 let isMongoConnected = false;
 
-mongoose.connect(MONGODB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+mongoose.connect(MONGODB_URI, {
+  serverSelectionTimeoutMS: 10000, // Increased timeout
+  socketTimeoutMS: 45000
 })
 .then(() => {
-  console.log('Connected to MongoDB');
+  console.log('✅ Successfully connected to MongoDB Atlas');
+  console.log('Database Name:', mongoose.connection.db.databaseName);
   isMongoConnected = true;
 })
 .catch(err => {
-  console.error('MongoDB connection error:', err);
-  console.log('Server will continue without database - using in-memory storage for demo');
+  console.error('❌ MongoDB connection error:', err.message);
+  console.error('Full error:', err);
+  console.log('⚠️  Server will continue with in-memory storage (data will not persist)');
   isMongoConnected = false;
 });
 
@@ -133,6 +143,7 @@ app.post('/api/register', async (req, res) => {
 
     let newUser;
     if (isMongoConnected) {
+      console.log('✅ Saving user to MongoDB...');
       // Create new user in MongoDB
       newUser = new User({
         firstName,
@@ -144,7 +155,9 @@ app.post('/api/register', async (req, res) => {
         password: hashedPassword
       });
       await newUser.save();
+      console.log('✅ User successfully saved to MongoDB with ID:', newUser._id);
     } else {
+      console.log('⚠️  Saving user to in-memory storage (data will be lost on server restart)');
       // Create new user in memory
       newUser = {
         _id: userIdCounter++,
@@ -158,6 +171,7 @@ app.post('/api/register', async (req, res) => {
         createdAt: new Date()
       };
       inMemoryUsers.push(newUser);
+      console.log('⚠️  User saved to in-memory storage. Total users in memory:', inMemoryUsers.length);
     }
 
     res.status(201).json({
@@ -227,22 +241,65 @@ app.post('/api/login', async (req, res) => {
 // Get all users (for testing)
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find({}, { password: 0 });
-    res.json(users);
+    let users;
+    if (isMongoConnected) {
+      console.log('ℹ️  Fetching users from MongoDB...');
+      users = await User.find({}, { password: 0 });
+      console.log(`✅ Found ${users.length} users in MongoDB`);
+    } else {
+      console.log('⚠️  Fetching users from in-memory storage...');
+      users = inMemoryUsers.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      console.log(`⚠️  Found ${users.length} users in memory`);
+    }
+    res.json({
+      source: isMongoConnected ? 'MongoDB' : 'In-Memory',
+      count: users.length,
+      users: users
+    });
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
+// Database status endpoint
+app.get('/api/db-status', (req, res) => {
+  res.json({
+    mongoConnected: isMongoConnected,
+    connectionState: mongoose.connection.readyState,
+    connectionStates: {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    },
+    databaseName: mongoose.connection.db?.databaseName || 'Not connected',
+    inMemoryUserCount: inMemoryUsers.length
+  });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    database: {
+      connected: isMongoConnected,
+      state: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Forgot Password Routes
 app.use('/api/auth', forgotPasswordRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Available at:`);
+  console.log(`  - Local: http://localhost:${PORT}`);
+  console.log(`  - Network: http://10.38.245.146:${PORT}`);
 });

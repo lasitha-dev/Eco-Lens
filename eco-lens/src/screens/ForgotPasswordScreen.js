@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AuthService from '../api/authService';
+import { API_BASE_URL } from '../config/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -103,7 +104,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     try {
       // Call API to request password reset
-      const response = await fetch('http://localhost:5002/api/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

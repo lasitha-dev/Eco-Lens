@@ -66,12 +66,12 @@ Follow these instructions to get the project running on your local machine for d
     npm install
     ```
 
-3.  **Set Up Environment Variables (if applicable):**
-    -   Create a `.env` file in the root directory.
-    -   Add any necessary API keys or server URLs:
+3.  **Set Up Environment Variables:**
+    -   Create a `.env` file in the root directory with:
         ```
-        API_URL=http://your-backend-server-url
+        API_URL=http://localhost:5002/api
         ```
+    -   Create a `.env` file in the backend directory with your MongoDB URI, email settings, and port configuration.
 
 ### Running the Application
 
