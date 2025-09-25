@@ -111,13 +111,16 @@ const LoginScreen = ({ navigation }) => {
       console.log('Login successful:', result);
       
       // Set auth context with the result
-      await setAuth({ 
-        token: result.token, 
-        user: result.user 
-      });
+      await setAuth(result);
       
-      // Navigate to Home screen after successful login
-      navigation.navigate('Home');
+      // Navigate based on user role
+      if (result.user.role === 'admin') {
+        console.log('✅ Admin login - redirecting to AdminDashboard');
+        navigation.navigate('AdminDashboard');
+      } else {
+        console.log('✅ Customer login - redirecting to Dashboard');
+        navigation.navigate('Dashboard');
+      }
     } catch (error) {
       Alert.alert(
         'Login Failed', 
@@ -322,6 +325,30 @@ const LoginScreen = ({ navigation }) => {
                 </Text>
               </View>
               <View style={styles.buttonGlow} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Admin Login Hint */}
+          <Animated.View 
+            style={[
+              styles.adminHint,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <Text style={styles.adminHintTitle}>🔑 Admin Access</Text>
+            <Text style={styles.adminHintText}>Email: admin@ecolens.com</Text>
+            <Text style={styles.adminHintText}>Password: EcoAdmin123!</Text>
+            <TouchableOpacity 
+              style={styles.adminQuickLogin}
+              onPress={() => {
+                setEmail('admin@ecolens.com');
+                setPassword('EcoAdmin123!');
+              }}
+            >
+              <Text style={styles.adminQuickLoginText}>Quick Admin Login</Text>
             </TouchableOpacity>
           </Animated.View>
 
@@ -614,6 +641,41 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  adminHint: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  adminHintTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  adminHintText: {
+    fontSize: 12,
+    color: '#C8E6C9',
+    textAlign: 'center',
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  adminQuickLogin: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
+    alignSelf: 'center',
+  },
+  adminQuickLoginText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 });
 

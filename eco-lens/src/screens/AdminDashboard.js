@@ -16,42 +16,189 @@ import {
   FlatList,
   Image,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import theme, { colors } from '../constants/theme';
 import ProductForm from '../components/ProductForm';
 import EcoScoreDisplay from '../components/EcoScoreDisplay';
 import { getGradeColor } from '../utils/SustainabilityCalculator';
+import ProductService from '../api/productService';
+import { MOCK_PRODUCTS } from '../constants/mockData';
+import { useAuth } from '../hooks/useAuthLogin';
 
 const AdminDashboard = ({ navigation }) => {
+  const { 
+    auth, 
+    user, 
+    isAdmin, 
+    isLoading: authLoading, 
+    checkAdminAccess, 
+    logout,
+    getUserName 
+  } = useAuth();
+  
   const [products, setProducts] = useState([]);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGrade, setFilterGrade] = useState('All');
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [adminName] = useState('Admin User'); // This could come from auth context
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    averageSustainabilityScore: 0,
+    gradeDistribution: {},
+    topGradeProducts: 0
+  });
 
-  // Mock initial data - in real app this would come from API
+  // Admin access check and redirect
   useEffect(() => {
-    // Initialize with empty array - products will be added through the form
-    setProducts([]);
-  }, []);
+    if (!authLoading) {
+      if (!auth || !user) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in to access the admin dashboard.',
+          [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+        );
+        return;
+      }
+      
+      if (!isAdmin) {
+        Alert.alert(
+          'Access Denied',
+          'You do not have permission to access the admin dashboard.',
+          [{ text: 'OK', onPress: () => navigation.navigate('Dashboard') }]
+        );
+        return;
+      }
+      
+      // User is authenticated and is admin, load data
+      console.log('✅ Admin access verified for:', getUserName());
+      loadProducts();
+      loadStats();
+    }
+  }, [auth, user, isAdmin, authLoading, navigation]);
 
-  const handleAddProduct = (productData) => {
-    setProducts(prev => [...prev, productData]);
-    setShowProductForm(false);
-    Alert.alert('Success', 'Product added successfully!');
+  // Load products from API
+  const loadProducts = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      
+      const response = await ProductService.getProducts({
+        search: searchQuery || undefined,
+        grade: filterGrade !== 'All' ? filterGrade : undefined,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+      
+      setProducts(response.products || []);
+      console.log(`✅ Loaded ${response.products?.length || 0} products from API`);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      Alert.alert(
+        'Load Error', 
+        `Failed to load products: ${error.message}\n\nWould you like to seed some sample data?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Seed Data', 
+            onPress: seedMockData
+          }
+        ]
+      );
+    } finally {
+      if (showLoader) setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
-  const handleEditProduct = (productData) => {
-    setProducts(prev => 
-      prev.map(product => 
-        product.id === productData.id ? productData : product
-      )
-    );
-    setEditingProduct(null);
-    setShowProductForm(false);
-    Alert.alert('Success', 'Product updated successfully!');
+  // Load statistics from API
+  const loadStats = async () => {
+    try {
+      const response = await ProductService.getProductStats();
+      setStats({
+        totalProducts: response.totalProducts || 0,
+        averageSustainabilityScore: response.averageSustainabilityScore || 0,
+        gradeDistribution: response.gradeDistribution || {},
+        topGradeProducts: response.topGradeProducts || 0
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // Don't show error for stats, just use defaults
+    }
+  };
+
+  // Seed mock data to backend (for development/testing)
+  const seedMockData = async () => {
+    try {
+      setIsLoading(true);
+      await ProductService.seedMockData(MOCK_PRODUCTS);
+      Alert.alert('Success', 'Sample products have been added to the database!');
+      await loadProducts(false);
+      await loadStats();
+    } catch (error) {
+      console.error('Error seeding data:', error);
+      Alert.alert('Error', `Failed to seed data: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Refresh products and stats
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([loadProducts(false), loadStats()]);
+  };
+
+  const handleAddProduct = async (productData) => {
+    try {
+      setIsLoading(true);
+      const response = await ProductService.createProduct(productData);
+      
+      // Add the new product to local state
+      setProducts(prev => [response.product, ...prev]);
+      setShowProductForm(false);
+      
+      // Refresh stats
+      await loadStats();
+      
+      Alert.alert('Success', 'Product added successfully!');
+      console.log(`✅ Product added: ${response.product.name}`);
+    } catch (error) {
+      console.error('Error adding product:', error);
+      Alert.alert('Error', `Failed to add product: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditProduct = async (productData) => {
+    try {
+      setIsLoading(true);
+      const response = await ProductService.updateProduct(productData.id, productData);
+      
+      // Update the product in local state
+      setProducts(prev => 
+        prev.map(product => 
+          product.id === productData.id ? response.product : product
+        )
+      );
+      
+      setEditingProduct(null);
+      setShowProductForm(false);
+      
+      // Refresh stats
+      await loadStats();
+      
+      Alert.alert('Success', 'Product updated successfully!');
+      console.log(`✅ Product updated: ${response.product.name}`);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      Alert.alert('Error', `Failed to update product: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeleteProduct = (productId) => {
@@ -63,9 +210,25 @@ const AdminDashboard = ({ navigation }) => {
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
-            setProducts(prev => prev.filter(product => product.id !== productId));
-            Alert.alert('Success', 'Product deleted successfully!');
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await ProductService.deleteProduct(productId);
+              
+              // Remove product from local state
+              setProducts(prev => prev.filter(product => product.id !== productId));
+              
+              // Refresh stats
+              await loadStats();
+              
+              Alert.alert('Success', 'Product deleted successfully!');
+              console.log(`✅ Product deleted: ${productId}`);
+            } catch (error) {
+              console.error('Error deleting product:', error);
+              Alert.alert('Error', `Failed to delete product: ${error.message}`);
+            } finally {
+              setIsLoading(false);
+            }
           }
         },
       ]
@@ -87,7 +250,7 @@ const AdminDashboard = ({ navigation }) => {
     setEditingProduct(null);
   };
 
-  // Filter and search products
+  // Filter products locally (for immediate UI feedback)
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,16 +261,20 @@ const AdminDashboard = ({ navigation }) => {
     return matchesSearch && matchesFilter;
   });
 
-  // Calculate dashboard statistics
-  const totalProducts = products.length;
-  const averageScore = products.length > 0 
-    ? Math.round(products.reduce((sum, product) => sum + product.sustainabilityScore, 0) / products.length)
-    : 0;
-  const gradeDistribution = products.reduce((acc, product) => {
-    acc[product.sustainabilityGrade] = (acc[product.sustainabilityGrade] || 0) + 1;
-    return acc;
-  }, {});
-  const topGradeProducts = products.filter(product => ['A', 'B'].includes(product.sustainabilityGrade)).length;
+  // Apply search filter when search query or filter changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadProducts(false); // Reload with new filters, but don't show loading spinner
+    }, 500); // Debounce API calls
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, filterGrade]);
+
+  // Calculate dashboard statistics from current stats
+  const totalProducts = stats.totalProducts;
+  const averageScore = stats.averageSustainabilityScore;
+  const gradeDistribution = stats.gradeDistribution;
+  const topGradeProducts = stats.topGradeProducts;
 
   const renderDashboardStats = () => (
     <View style={styles.statsContainer}>
@@ -258,14 +425,23 @@ const AdminDashboard = ({ navigation }) => {
       <View style={styles.header}>
         <View>
           <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.adminName}>{adminName}</Text>
+          <Text style={styles.adminName}>{getUserName() || 'Admin'}</Text>
+          <Text style={styles.roleText}>Administrator</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={openAddForm}
-        >
-          <Text style={styles.addButtonText}>+ Add Product</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={openAddForm}
+          >
+            <Text style={styles.addButtonText}>+ Add Product</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={logout}
+          >
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Dashboard Stats */}
@@ -274,31 +450,62 @@ const AdminDashboard = ({ navigation }) => {
       {/* Search and Filter */}
       {renderSearchAndFilter()}
 
+      {/* Loading Indicator */}
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading products...</Text>
+        </View>
+      )}
+
       {/* Products List */}
-      <View style={styles.productsSection}>
-        <Text style={styles.sectionTitle}>
-          Products ({filteredProducts.length})
-        </Text>
-        
-        {filteredProducts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              {products.length === 0 
-                ? 'No products added yet. Tap "Add Product" to get started!'
-                : 'No products match your search criteria.'
-              }
+      {!isLoading && (
+        <View style={styles.productsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Products ({filteredProducts.length})
             </Text>
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <Text style={styles.refreshButtonText}>
+                {isRefreshing ? 'Refreshing...' : '↻ Refresh'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={filteredProducts}
-            renderItem={renderProductItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.productsList}
-          />
-        )}
-      </View>
+          
+          {filteredProducts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                {products.length === 0 
+                  ? 'No products in database. Tap "Add Product" to get started, or use "Seed Data" to add sample products!'
+                  : 'No products match your search criteria.'
+                }
+              </Text>
+              {products.length === 0 && (
+                <TouchableOpacity 
+                  style={styles.seedButton}
+                  onPress={seedMockData}
+                >
+                  <Text style={styles.seedButtonText}>Seed Sample Data</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <FlatList
+              data={filteredProducts}
+              renderItem={renderProductItem}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.productsList}
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+            />
+          )}
+        </View>
+      )}
 
       {/* Product Form Modal */}
       <Modal
@@ -358,6 +565,49 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize['2xl'],
     fontWeight: theme.typography.fontWeight.bold,
     color: colors.text,
+  },
+  
+  roleText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: colors.secondary,
+    fontStyle: 'italic',
+  },
+  
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  logoutButton: {
+    backgroundColor: colors.error,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  
+  logoutButtonText: {
+    color: colors.textLight,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  errorText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.error,
+    marginBottom: 8,
+  },
+  
+  errorSubtext: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   
   addButton: {
@@ -465,11 +715,57 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 16,
+  },
+  
+  refreshButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  
+  refreshButtonText: {
+    color: colors.textLight,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  
+  seedButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  
+  seedButtonText: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontWeight: '600',
   },
   
   productsList: {

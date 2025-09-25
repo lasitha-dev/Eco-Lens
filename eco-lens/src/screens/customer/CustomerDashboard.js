@@ -3,7 +3,7 @@
  * Main screen for browsing eco-friendly products
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
+import ProductService from '../../api/productService';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 
@@ -29,14 +30,14 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const CustomerDashboard = () => {
   // State management
-  const [products] = useState(MOCK_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSort, setSelectedSort] = useState('eco-high');
   const [isListView, setIsListView] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -56,63 +57,99 @@ const CustomerDashboard = () => {
     setIsModalVisible(false);
   }, []);
 
+  // Load products on component mount
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  // Load products from API
+  const loadProducts = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      
+      const response = await ProductService.getProducts({
+        search: searchQuery || undefined,
+        category: selectedCategory !== 'All' ? selectedCategory : undefined,
+        sortBy: getSortField(selectedSort),
+        sortOrder: getSortOrder(selectedSort),
+        limit: 100 // Get more products for better filtering
+      });
+      
+      setProducts(response.products || []);
+      console.log(`✅ Loaded ${response.products?.length || 0} products from API`);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      
+      // Fallback to mock data if API fails
+      console.log('⚠️  API failed, falling back to mock data');
+      setProducts(MOCK_PRODUCTS);
+      
+      // Show user-friendly error for first load only
+      if (showLoader) {
+        Alert.alert(
+          'Connection Issue', 
+          'Unable to load latest products from server. Showing sample data instead.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      if (showLoader) setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Convert sort option to API field
+  const getSortField = (sortOption) => {
+    const sortMap = {
+      'eco-high': 'sustainabilityScore',
+      'eco-low': 'sustainabilityScore', 
+      'price-low': 'price',
+      'price-high': 'price',
+      'rating': 'rating',
+      'popular': 'reviewCount'
+    };
+    return sortMap[sortOption] || 'sustainabilityScore';
+  };
+
+  // Convert sort option to API order
+  const getSortOrder = (sortOption) => {
+    const orderMap = {
+      'eco-high': 'desc',
+      'eco-low': 'asc',
+      'price-low': 'asc', 
+      'price-high': 'desc',
+      'rating': 'desc',
+      'popular': 'desc'
+    };
+    return orderMap[sortOption] || 'desc';
+  };
+
+  // Reload products when filters change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadProducts(false); // Reload with new filters, but don't show loading spinner
+    }, 300); // Debounce API calls
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, selectedCategory, selectedSort]);
+
   // Handle refresh
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1500);
+    loadProducts(false);
   }, []);
 
-  // Filter and sort products
+  // Filter products locally (API handles sorting)
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply category filter
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
-    }
-
-    // Apply preset filter
+    // Apply preset filter (API doesn't handle these custom filters)
     if (selectedFilter) {
       filtered = FILTER_PRESETS[selectedFilter].filter(filtered);
     }
 
-    // Apply sorting
-    switch (selectedSort) {
-      case 'eco-high':
-        filtered.sort((a, b) => b.sustainabilityScore - a.sustainabilityScore);
-        break;
-      case 'eco-low':
-        filtered.sort((a, b) => a.sustainabilityScore - b.sustainabilityScore);
-        break;
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'popular':
-        filtered.sort((a, b) => b.reviewCount - a.reviewCount);
-        break;
-      default:
-        break;
-    }
-
     return filtered;
-  }, [products, searchQuery, selectedCategory, selectedSort, selectedFilter]);
+  }, [products, selectedFilter]);
 
   // Render filters header component (categories, filters, controls)
   const renderFiltersHeader = useCallback(() => (
