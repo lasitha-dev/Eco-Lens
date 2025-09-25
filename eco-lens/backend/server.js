@@ -1,11 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 require('dotenv').config();
 
 const User = require('./models/User');
+const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -31,10 +34,13 @@ mongoose.connect(MONGODB_URI, {
   serverSelectionTimeoutMS: 10000, // Increased timeout
   socketTimeoutMS: 45000
 })
-.then(() => {
+.then(async () => {
   console.log('✅ Successfully connected to MongoDB Atlas');
   console.log('Database Name:', mongoose.connection.db.databaseName);
   isMongoConnected = true;
+  
+  // Seed admin user if not exists
+  await seedAdminUser();
 })
 .catch(err => {
   console.error('❌ MongoDB connection error:', err.message);
@@ -46,6 +52,62 @@ mongoose.connect(MONGODB_URI, {
 // In-memory storage for demo purposes when MongoDB is not available
 let inMemoryUsers = [];
 let userIdCounter = 1;
+
+// JWT Helper Functions
+const generateToken = (user) => {
+  const payload = {
+    userId: user._id,
+    email: user.email,
+    role: user.role,
+    firstName: user.firstName,
+    lastName: user.lastName
+  };
+  
+  return jwt.sign(payload, process.env.JWT_SECRET || 'your-fallback-secret-key', {
+    expiresIn: '24h'
+  });
+};
+
+const verifyToken = (token) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret-key');
+  } catch (error) {
+    throw new Error('Invalid token');
+  }
+};
+
+// Admin User Seeding Function
+const seedAdminUser = async () => {
+  try {
+    const adminEmail = 'admin@ecolens.com';
+    const existingAdmin = await User.findOne({ email: adminEmail });
+    
+    if (!existingAdmin) {
+      const adminPassword = 'EcoAdmin123!';
+      const hashedPassword = await bcrypt.hash(adminPassword, 12);
+      
+      const adminUser = new User({
+        firstName: 'Eco',
+        lastName: 'Admin',
+        email: adminEmail,
+        address: 'Eco-Lens HQ, Green Street',
+        dateOfBirth: new Date('1990-01-01'),
+        country: 'Global',
+        password: hashedPassword,
+        role: 'admin'
+      });
+      
+      await adminUser.save();
+      console.log('🔑 Admin user created successfully!');
+      console.log('   Email: admin@ecolens.com');
+      console.log('   Password: EcoAdmin123!');
+    } else {
+      console.log('🔑 Admin user already exists');
+    }
+  } catch (error) {
+    console.error('❌ Error seeding admin user:', error);
+  }
+};
 
 
 // Validation middleware
@@ -221,14 +283,18 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Generate JWT token
+    const token = generateToken(user);
+
     res.json({
       message: 'Login successful',
-      token: 'demo-token-' + Date.now(), // Simple token for demo
+      token,
       user: {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
-        email: user.email
+        email: user.email,
+        role: user.role || 'customer'
       }
     });
 
@@ -296,6 +362,9 @@ app.get('/api/health', (req, res) => {
 
 // Forgot Password Routes
 app.use('/api/auth', forgotPasswordRoutes);
+
+// Product Routes
+app.use('/api/products', productRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
