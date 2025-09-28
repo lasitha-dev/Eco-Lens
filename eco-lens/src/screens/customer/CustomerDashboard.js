@@ -166,17 +166,9 @@ const CustomerDashboard = ({ navigation }) => {
 
   // Get products to display based on current view
   const getDisplayProducts = () => {
-    console.log('getDisplayProducts called:');
-    console.log('- showPersonalized:', showPersonalized);
-    console.log('- surveyCompleted:', surveyCompleted);
-    console.log('- personalizedProducts.length:', personalizedProducts.length);
-    console.log('- products.length:', products.length);
-    
     if (showPersonalized && surveyCompleted && personalizedProducts.length > 0) {
-      console.log('Returning personalized products');
       return personalizedProducts;
     }
-    console.log('Returning all products');
     return products;
   };
 
@@ -197,7 +189,7 @@ const CustomerDashboard = ({ navigation }) => {
     }
 
     return filtered;
-  }, [products, selectedFilter, showPersonalized, surveyCompleted, personalizedProducts]);
+  }, [products, selectedFilter]);
 
   // Render filters header component (categories, filters, controls)
   const renderFiltersHeader = useCallback(() => (
@@ -341,12 +333,7 @@ const CustomerDashboard = ({ navigation }) => {
             </View>
             <TouchableOpacity
               style={styles.toggleButton}
-              onPress={() => {
-                console.log('Toggle pressed - Current showPersonalized:', showPersonalized);
-                console.log('Personalized products count:', personalizedProducts.length);
-                console.log('All products count:', products.length);
-                setShowPersonalized(!showPersonalized);
-              }}
+              onPress={() => setShowPersonalized(!showPersonalized)}
             >
               <Text style={styles.toggleButtonText}>
                 {showPersonalized ? 'Show All Products' : 'Show Personalized Products'}
