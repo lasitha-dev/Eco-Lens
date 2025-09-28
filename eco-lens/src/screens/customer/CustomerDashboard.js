@@ -278,7 +278,7 @@ const CustomerDashboard = () => {
       <View style={styles.fixedHeader}>
         {/* App Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>🌿 Eco-Lens</Text>
+          <Text style={styles.title}>🌱 Eco-Lens</Text>
           <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
         </View>
 
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   
   fixedHeader: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.m,
+    paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.m,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
