@@ -537,13 +537,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   surveyPromptTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#856404',
     marginBottom: 2,
   },
   surveyPromptSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#856404',
   },
   completeSurveyButton: {
@@ -554,8 +554,8 @@ const styles = StyleSheet.create({
   },
   completeSurveyButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '500',
   },
   
   searchContainer: {
