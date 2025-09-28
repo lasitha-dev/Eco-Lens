@@ -356,7 +356,7 @@ const CustomerDashboard = ({ navigation }) => {
         ) : (
           <View style={styles.surveyPromptHeader}>
             <View style={styles.surveyPromptContent}>
-              <Text style={styles.surveyPromptTitle}>🎯 Personalize Your Experience</Text>
+              <Text style={styles.surveyPromptTitle}>🎯 Personalize Your Experience </Text>
               <Text style={styles.surveyPromptSubtitle}>
                 Complete a quick survey to see personalized product recommendations
               </Text>
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   surveyPromptTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#856404',
     marginBottom: 2,
@@ -543,8 +543,8 @@ const styles = StyleSheet.create({
   },
   completeSurveyButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '500',
   },
   
   searchContainer: {
