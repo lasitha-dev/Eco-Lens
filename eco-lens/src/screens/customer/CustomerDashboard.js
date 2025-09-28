@@ -336,7 +336,7 @@ const CustomerDashboard = ({ navigation }) => {
               onPress={() => setShowPersonalized(!showPersonalized)}
             >
               <Text style={styles.toggleButtonText}>
-                {showPersonalized ? 'Show All' : 'Show Personalized'}
+                {showPersonalized ? 'Show All Products' : 'Show Personalized Products'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   personalizedTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: theme.colors.primary,
     marginBottom: 2,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   
   surveyPromptHeader: {
