@@ -360,7 +360,7 @@ const CustomerDashboard = ({ navigation }) => {
               }}
             >
               <Text style={styles.toggleButtonText}>
-                {showPersonalized ? 'Show All Products' : 'Show Personalized Products'}
+                {showPersonalized ? 'Show All ' : 'Show Personalized'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   },
   toggleButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   
