@@ -71,6 +71,13 @@ const CustomerDashboard = ({ navigation }) => {
     loadPersonalizedRecommendations();
   }, []);
 
+  // Debug: Track showPersonalized changes
+  useEffect(() => {
+    console.log('showPersonalized changed to:', showPersonalized);
+    console.log('Current products count:', products.length);
+    console.log('Current personalized products count:', personalizedProducts.length);
+  }, [showPersonalized, products.length, personalizedProducts.length]);
+
   // Load personalized recommendations
   const loadPersonalizedRecommendations = async () => {
     if (!user || !auth) return;
@@ -166,9 +173,17 @@ const CustomerDashboard = ({ navigation }) => {
 
   // Get products to display based on current view
   const getDisplayProducts = () => {
+    console.log('getDisplayProducts called:');
+    console.log('- showPersonalized:', showPersonalized);
+    console.log('- surveyCompleted:', surveyCompleted);
+    console.log('- personalizedProducts.length:', personalizedProducts.length);
+    console.log('- products.length:', products.length);
+    
     if (showPersonalized && surveyCompleted && personalizedProducts.length > 0) {
+      console.log('Returning personalized products');
       return personalizedProducts;
     }
+    console.log('Returning all products');
     return products;
   };
 
@@ -181,15 +196,19 @@ const CustomerDashboard = ({ navigation }) => {
 
   // Filter products locally (API handles sorting)
   const filteredProducts = useMemo(() => {
+    console.log('filteredProducts recalculating...');
     let filtered = [...getDisplayProducts()];
+    console.log('Initial filtered count:', filtered.length);
 
     // Apply preset filter (API doesn't handle these custom filters)
     if (selectedFilter) {
       filtered = FILTER_PRESETS[selectedFilter].filter(filtered);
+      console.log('After filter applied:', filtered.length);
     }
 
+    console.log('Final filtered count:', filtered.length);
     return filtered;
-  }, [products, selectedFilter]);
+  }, [products, selectedFilter, showPersonalized, surveyCompleted, personalizedProducts]);
 
   // Render filters header component (categories, filters, controls)
   const renderFiltersHeader = useCallback(() => (
@@ -333,7 +352,12 @@ const CustomerDashboard = ({ navigation }) => {
             </View>
             <TouchableOpacity
               style={styles.toggleButton}
-              onPress={() => setShowPersonalized(!showPersonalized)}
+              onPress={() => {
+                console.log('Toggle pressed - Current showPersonalized:', showPersonalized);
+                console.log('Personalized products count:', personalizedProducts.length);
+                console.log('All products count:', products.length);
+                setShowPersonalized(!showPersonalized);
+              }}
             >
               <Text style={styles.toggleButtonText}>
                 {showPersonalized ? 'Show All Products' : 'Show Personalized Products'}
