@@ -16,7 +16,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AuthService from '../api/authService';
+import SurveyService from '../api/surveyService';
 import { useAuth } from '../hooks/useAuthLogin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -118,8 +120,40 @@ const LoginScreen = ({ navigation }) => {
         console.log('✅ Admin login - redirecting to AdminDashboard');
         navigation.navigate('AdminDashboard');
       } else {
-        console.log('✅ Customer login - redirecting to Dashboard');
-        navigation.navigate('Dashboard');
+        // Check if customer has completed or skipped the survey
+        try {
+          // First check if user has completed or skipped the survey locally
+          const surveyCompleted = await AsyncStorage.getItem('@eco_lens_survey_completed');
+          const surveySkipped = await AsyncStorage.getItem('@eco_lens_survey_skipped');
+          
+          if (surveyCompleted === 'true') {
+            console.log('✅ Customer login - survey was completed, redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+            return;
+          }
+          
+          if (surveySkipped === 'true') {
+            console.log('✅ Customer login - survey was skipped, redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+            return;
+          }
+
+          // Check survey completion status from server
+          const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
+          console.log('Survey status:', surveyStatus);
+          
+          if (!surveyStatus.completed) {
+            console.log('✅ Customer login - redirecting to OnboardingSurvey');
+            navigation.navigate('OnboardingSurvey');
+          } else {
+            console.log('✅ Customer login - redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+          }
+        } catch (error) {
+          console.error('Error checking survey status:', error);
+          // If survey check fails, go to dashboard
+          navigation.navigate('Dashboard');
+        }
       }
     } catch (error) {
       Alert.alert(

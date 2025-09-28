@@ -9,6 +9,7 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const surveyRoutes = require('./routes/surveyRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -372,6 +373,9 @@ app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
+
+// Survey Routes
+app.use('/api/survey', surveyRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

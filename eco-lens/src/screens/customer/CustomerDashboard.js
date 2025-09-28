@@ -23,14 +23,21 @@ import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import ProductService from '../../api/productService';
+import SurveyService from '../../api/surveyService';
+import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const CustomerDashboard = () => {
+const CustomerDashboard = ({ navigation }) => {
+  const { user, auth } = useAuth();
+  
   // State management
   const [products, setProducts] = useState([]);
+  const [personalizedProducts, setPersonalizedProducts] = useState([]);
+  const [userPreferences, setUserPreferences] = useState(null);
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSort, setSelectedSort] = useState('eco-high');
@@ -40,6 +47,7 @@ const CustomerDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showPersonalized, setShowPersonalized] = useState(true);
 
   // Handle product press
   const handleProductPress = useCallback((product) => {
@@ -57,10 +65,33 @@ const CustomerDashboard = () => {
     setIsModalVisible(false);
   }, []);
 
-  // Load products on component mount
+  // Load products and personalized recommendations on component mount
   useEffect(() => {
     loadProducts();
+    loadPersonalizedRecommendations();
   }, []);
+
+  // Load personalized recommendations
+  const loadPersonalizedRecommendations = async () => {
+    if (!user || !auth) return;
+    
+    try {
+      // First check if survey is completed
+      const statusResponse = await SurveyService.checkSurveyStatus(user.id, auth);
+      setSurveyCompleted(statusResponse.completed);
+      
+      if (statusResponse.completed) {
+        const response = await SurveyService.getRecommendations(user.id, auth);
+        if (response.recommendations && response.recommendations.length > 0) {
+          setPersonalizedProducts(response.recommendations);
+          setUserPreferences(response.preferences);
+          console.log(`✅ Loaded ${response.recommendations.length} personalized recommendations`);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading personalized recommendations:', error);
+    }
+  };
 
   // Load products from API
   const loadProducts = async (showLoader = true) => {
@@ -133,15 +164,24 @@ const CustomerDashboard = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, selectedCategory, selectedSort]);
 
+  // Get products to display based on current view
+  const getDisplayProducts = () => {
+    if (showPersonalized && surveyCompleted && personalizedProducts.length > 0) {
+      return personalizedProducts;
+    }
+    return products;
+  };
+
   // Handle refresh
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     loadProducts(false);
+    loadPersonalizedRecommendations();
   }, []);
 
   // Filter products locally (API handles sorting)
   const filteredProducts = useMemo(() => {
-    let filtered = [...products];
+    let filtered = [...getDisplayProducts()];
 
     // Apply preset filter (API doesn't handle these custom filters)
     if (selectedFilter) {
@@ -282,6 +322,41 @@ const CustomerDashboard = () => {
           <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
         </View>
 
+        {/* Personalized Recommendations Header */}
+        {surveyCompleted && personalizedProducts.length > 0 ? (
+          <View style={styles.personalizedHeader}>
+            <View style={styles.personalizedTitleContainer}>
+              <Text style={styles.personalizedTitle}>🌟 Recommended for You</Text>
+              <Text style={styles.personalizedSubtitle}>
+                Based on your preferences
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => setShowPersonalized(!showPersonalized)}
+            >
+              <Text style={styles.toggleButtonText}>
+                {showPersonalized ? 'Show All' : 'Show Personalized'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.surveyPromptHeader}>
+            <View style={styles.surveyPromptContent}>
+              <Text style={styles.surveyPromptTitle}>🎯 Personalize Your Experience</Text>
+              <Text style={styles.surveyPromptSubtitle}>
+                Complete a quick survey to see personalized product recommendations
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.completeSurveyButton}
+              onPress={() => navigation.navigate('OnboardingSurvey')}
+            >
+              <Text style={styles.completeSurveyButtonText}>Take Survey</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -381,6 +456,82 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.body2,
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
+  },
+  
+  personalizedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0F8FF',
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.round,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+  },
+  personalizedTitleContainer: {
+    flex: 1,
+  },
+  personalizedTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 2,
+  },
+  personalizedSubtitle: {
+    fontSize: 12,
+    color: '#6C757D',
+  },
+  toggleButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  toggleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  surveyPromptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFF3CD',
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.round,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+  },
+  surveyPromptContent: {
+    flex: 1,
+  },
+  surveyPromptTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 2,
+  },
+  surveyPromptSubtitle: {
+    fontSize: 12,
+    color: '#856404',
+  },
+  completeSurveyButton: {
+    backgroundColor: '#FFC107',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  completeSurveyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   
   searchContainer: {

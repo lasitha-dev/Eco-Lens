@@ -12,6 +12,7 @@ import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import AdminDashboard from '../screens/AdminDashboard';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import OnboardingSurvey from '../screens/OnboardingSurvey';
 
 const Stack = createNativeStackNavigator();
 
@@ -44,6 +45,9 @@ const AppNavigator = () => {
       
       {/* Common Screens */}
       <Stack.Screen name="Home" component={HomeScreen} />
+      
+      {/* Onboarding Survey */}
+      <Stack.Screen name="OnboardingSurvey" component={OnboardingSurvey} />
       
       {/* Customer Screens */}
       <Stack.Screen name="Dashboard" component={CustomerDashboard} />
