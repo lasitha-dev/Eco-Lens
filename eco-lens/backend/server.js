@@ -9,6 +9,7 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -272,7 +273,7 @@ app.post('/api/login', async (req, res) => {
     } else {
       user = inMemoryUsers.find(u => u.email === email.toLowerCase());
     }
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -300,6 +301,103 @@ app.post('/api/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get user profile
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        gender: user.gender
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update user profile
+app.patch('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, gender, email, password } = req.body;
+    const userId = req.user.id;
+
+    // Prepare update object
+    const updateData = {};
+
+    if (name) {
+      // Split name into firstName and lastName
+      const nameParts = name.trim().split(' ');
+      updateData.firstName = nameParts[0] || '';
+      updateData.lastName = nameParts.slice(1).join(' ') || '';
+    }
+
+    if (phone !== undefined) updateData.phone = phone;
+    if (gender) updateData.gender = gender;
+    if (email) {
+      updateData.email = email.toLowerCase();
+      // Check if email is already taken by another user
+      const existingUser = await User.findOne({ email: updateData.email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already in use by another account' });
+      }
+    }
+
+    if (password) {
+      // Validate password
+      if (!validatePassword(password)) {
+        return res.status(400).json({
+          error: 'Password must contain uppercase letter, number, special character, and be at least 8 characters'
+        });
+      }
+      // Hash new password
+      updateData.password = await bcrypt.hash(password, 12);
+    }
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser._id,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        gender: updatedUser.gender
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Invalid data provided' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });

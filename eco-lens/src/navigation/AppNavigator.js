@@ -10,6 +10,8 @@ import SignUpScreen from '../screens/SignUpScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import AdminDashboard from '../screens/AdminDashboard';
+import MyProfileScreen from '../screens/MyProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
@@ -47,7 +49,9 @@ const AppNavigator = () => {
       
       {/* Customer Screens */}
       <Stack.Screen name="Dashboard" component={CustomerDashboard} />
-      
+      <Stack.Screen name="MyProfile" component={MyProfileScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+
       {/* Admin Screens */}
       <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
     </Stack.Navigator>

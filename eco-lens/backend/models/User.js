@@ -39,6 +39,15 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 8
   },
+  phone: {
+    type: String,
+    trim: true
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', 'prefer-not-to-say'],
+    default: 'prefer-not-to-say'
+  },
   role: {
     type: String,
     enum: ['customer', 'admin'],

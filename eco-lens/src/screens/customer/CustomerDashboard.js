@@ -278,7 +278,14 @@ const CustomerDashboard = () => {
       <View style={styles.fixedHeader}>
         {/* App Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>🌿 Eco-Lens</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>🌿 Eco-Lens</Text>
+            <TouchableOpacity onPress={() => { console.log('Profile icon pressed'); navigation.navigate('MyProfile'); }} style={styles.profileIcon}>
+              <View style={styles.profileCircle}>
+                <Text style={styles.profileText}>👤</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
         </View>
 
@@ -369,12 +376,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.m,
   },
-  
+
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+
   title: {
     fontSize: theme.typography.fontSize.h2,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
     marginBottom: theme.spacing.xs,
+  },
+
+  profileIcon: {
+    padding: 5,
+  },
+
+  profileCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  profileText: {
+    fontSize: 20,
   },
   
   subtitle: {
