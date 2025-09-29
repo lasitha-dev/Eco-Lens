@@ -251,6 +251,104 @@ class AuthService {
       return null;
     }
   }
+
+  // Request password reset
+  static async requestPasswordReset(email) {
+    try {
+      console.log(`Requesting password reset for: ${email}`);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send reset email');
+      }
+
+      const data = await response.json();
+      console.log('✅ Password reset request successful');
+      return data;
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Verify reset token
+  static async verifyResetToken(token) {
+    try {
+      console.log('Verifying reset token...');
+      
+      const response = await fetch(`${API_BASE_URL}/auth/verify-reset-token?token=${token}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Invalid or expired token');
+      }
+
+      const data = await response.json();
+      console.log('✅ Reset token is valid');
+      return data;
+    } catch (error) {
+      console.error('Error verifying reset token:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Reset password with token
+  static async resetPassword(token, newPassword) {
+    try {
+      console.log('Resetting password with token...');
+      
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reset password');
+      }
+
+      const data = await response.json();
+      console.log('✅ Password reset successful');
+      return data;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
 }
 
 export default AuthService;

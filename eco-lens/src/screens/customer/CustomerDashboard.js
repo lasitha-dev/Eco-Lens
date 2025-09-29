@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -278,7 +279,7 @@ const CustomerDashboard = () => {
       <View style={styles.fixedHeader}>
         {/* App Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>🌿 Eco-Lens</Text>
+          <Text style={styles.title}>🌱 Eco-Lens</Text>
           <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
         </View>
 
@@ -349,8 +350,10 @@ const styles = StyleSheet.create({
   
   fixedHeader: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.m,
+    paddingTop: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.l,
+    paddingHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.medium,
@@ -369,12 +372,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.m,
   },
-  
+
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+
   title: {
     fontSize: theme.typography.fontSize.h2,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
     marginBottom: theme.spacing.xs,
+  },
+
+  profileIcon: {
+    padding: 5,
+  },
+
+  profileCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: theme.colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  profileText: {
+    fontSize: 20,
   },
   
   subtitle: {
@@ -387,8 +422,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.m,
+    marginHorizontal: 0,
+    marginBottom: 0,
     paddingHorizontal: theme.spacing.m,
     borderRadius: theme.borderRadius.round,
     height: 48,
@@ -518,7 +553,7 @@ const styles = StyleSheet.create({
   
   productList: {
     paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   
   gridRow: {

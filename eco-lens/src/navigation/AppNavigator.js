@@ -8,8 +8,10 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import HomeScreen from '../screens/HomeScreen';
-import CustomerDashboard from '../screens/customer/CustomerDashboard';
+import CustomerTabNavigator from './CustomerTabNavigator';
 import AdminDashboard from '../screens/AdminDashboard';
+import MyProfileScreen from '../screens/MyProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
@@ -29,27 +31,35 @@ const AppNavigator = () => {
 
   return (
     <Stack.Navigator
-      initialRouteName={auth ? (isAdmin ? 'AdminDashboard' : 'Dashboard') : 'Welcome'}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
       }}
     >
-      {/* Authentication Screens */}
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="SignUp" component={SignUpScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-      
-      {/* Common Screens */}
-      <Stack.Screen name="Home" component={HomeScreen} />
-      
-      {/* Customer Screens */}
-      <Stack.Screen name="Dashboard" component={CustomerDashboard} />
-      
-      {/* Admin Screens */}
-      <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+      {auth ? (
+        // Authenticated user screens
+        isAdmin ? (
+          // Admin screens
+          <>
+            <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+          </>
+        ) : (
+          // Customer screens
+          <>
+            <Stack.Screen name="Dashboard" component={CustomerTabNavigator} />
+            <Stack.Screen name="Home" component={HomeScreen} />
+          </>
+        )
+      ) : (
+        // Non-authenticated screens
+        <>
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 };

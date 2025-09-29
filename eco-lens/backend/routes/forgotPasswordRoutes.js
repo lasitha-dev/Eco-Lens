@@ -7,6 +7,34 @@ const { sendPasswordResetEmail } = require('../utils/sendEmail');
 
 const router = express.Router();
 
+// Test email endpoint (for development only)
+router.post('/test-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Generate a test token
+    const testToken = 'test-token-' + Date.now();
+    
+    // Send test email
+    const result = await sendPasswordResetEmail(email, testToken);
+    
+    res.json({ 
+      message: 'Test email sent successfully',
+      result: result
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ 
+      message: 'Failed to send test email',
+      error: error.message 
+    });
+  }
+});
+
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -44,10 +72,13 @@ router.post('/forgot-password', async (req, res) => {
 
     // Send email
     try {
-      await sendPasswordResetEmail(email, token);
+      const emailResult = await sendPasswordResetEmail(email, token);
+      console.log(`✅ Password reset email sent to ${email}`, emailResult);
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Don't return error to user for security
+      console.error('❌ Email sending failed:', emailError);
+      // Clean up the token since email failed to send
+      await PasswordReset.deleteOne({ _id: passwordReset._id });
+      // Don't return error to user for security, but log it
     }
 
     res.json({ message: responseMessage });
@@ -96,6 +127,18 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'Token and new password are required' });
     }
 
+    // Validate password strength
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasNumber = /\d/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+    const isLongEnough = newPassword.length >= 8;
+
+    if (!hasUpperCase || !hasNumber || !hasSpecialChar || !isLongEnough) {
+      return res.status(400).json({ 
+        message: 'Password must contain uppercase letter, number, special character, and be at least 8 characters' 
+      });
+    }
+
     // Find token in database
     const passwordReset = await PasswordReset.findOne({ token });
 
@@ -115,10 +158,16 @@ router.post('/reset-password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Update user's password
-    await User.findByIdAndUpdate(passwordReset.userId, { password: hashedPassword });
+    const updatedUser = await User.findByIdAndUpdate(
+      passwordReset.userId, 
+      { password: hashedPassword },
+      { new: true, select: 'email firstName lastName' }
+    );
 
     // Delete the token after use
     await PasswordReset.deleteOne({ _id: passwordReset._id });
+
+    console.log(`✅ Password reset successful for user: ${updatedUser.email}`);
 
     res.json({ message: 'Password has been reset successfully' });
   } catch (error) {
