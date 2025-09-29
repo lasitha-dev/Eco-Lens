@@ -16,19 +16,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { API_BASE_URL } from '../config/api';
+import AuthService from '../api/authService';
 
 const { width, height } = Dimensions.get('window');
 
 const ResetPasswordScreen = ({ navigation, route }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetToken, setResetToken] = useState(route?.params?.token || '');
   const [loading, setLoading] = useState(false);
+  const [tokenValidating, setTokenValidating] = useState(false);
+  const [tokenValid, setTokenValid] = useState(false);
   const [newPasswordFocused, setNewPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+  const [tokenFocused, setTokenFocused] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const token = route?.params?.token || '';
+  const initialToken = route?.params?.token || '';
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -75,8 +80,17 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     );
     pulseAnimation.start();
 
+    // Validate token if provided
+    if (initialToken) {
+      setTokenValidating(true);
+      validateToken(initialToken);
+    } else {
+      setTokenValidating(false);
+      setTokenValid(false);
+    }
+
     return () => pulseAnimation.stop();
-  }, []);
+  }, [initialToken]);
 
   const validatePassword = (password) => {
     const hasUpperCase = /[A-Z]/.test(password);
@@ -87,7 +101,57 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     return hasUpperCase && hasNumber && hasSpecialChar && isLongEnough;
   };
 
+  const validateToken = async (tokenToValidate = resetToken) => {
+    if (!tokenToValidate) {
+      setTokenValidating(false);
+      setTokenValid(false);
+      return;
+    }
+
+    try {
+      setTokenValidating(true);
+      await AuthService.verifyResetToken(tokenToValidate);
+      setTokenValid(true);
+      console.log('✅ Reset token is valid');
+      // Small haptic feedback or visual indication that token is valid
+    } catch (error) {
+      console.error('Token validation error:', error);
+      setTokenValid(false);
+      Alert.alert(
+        'Invalid Reset Code',
+        error.message || 'This reset code is invalid or has expired. Please request a new password reset.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setTokenValidating(false);
+    }
+  };
+
+  // Auto-validate token when user enters it manually
+  useEffect(() => {
+    if (resetToken && resetToken.length > 10 && !initialToken) { // Only for manually entered tokens
+      const timeoutId = setTimeout(() => {
+        validateToken(resetToken);
+      }, 500); // Debounce validation
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [resetToken, initialToken]);
+
   const handleResetPassword = async () => {
+    console.log('Button state check:', {
+      resetToken: !!resetToken,
+      tokenValid,
+      newPassword: !!newPassword,
+      confirmPassword: !!confirmPassword,
+      loading
+    });
+    
+    if (!resetToken.trim()) {
+      Alert.alert('Missing Reset Code', 'Please enter your reset code.');
+      return;
+    }
+
     if (!newPassword.trim() || !confirmPassword.trim()) {
       Alert.alert('Missing Information', 'Please fill in both password fields.');
       return;
@@ -103,11 +167,6 @@ const ResetPasswordScreen = ({ navigation, route }) => {
         'Invalid Password',
         'Password must contain uppercase letter, number, special character, and be at least 8 characters.'
       );
-      return;
-    }
-
-    if (!token) {
-      Alert.alert('Invalid Link', 'Reset token is missing. Please request a new reset link.');
       return;
     }
 
@@ -129,20 +188,8 @@ const ResetPasswordScreen = ({ navigation, route }) => {
 
     try {
       // Call API to reset password
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, newPassword }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to reset password');
-      }
-
-      const data = await response.json();
+      const data = await AuthService.resetPassword(resetToken, newPassword);
+      
       Alert.alert(
         'Password Reset Successful',
         'Your password has been reset successfully. You can now log in with your new password.',
@@ -163,6 +210,53 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  // Show loading screen while validating token
+  if (tokenValidating) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+        <View style={styles.backgroundGradient}>
+          <Animated.View style={[styles.backgroundCircle1, { opacity: fadeAnim }]} />
+          <Animated.View style={[styles.backgroundCircle2, { opacity: fadeAnim }]} />
+        </View>
+        <View style={[styles.keyboardView, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={[styles.subtitle, { marginTop: 16, textAlign: 'center' }]}>
+            Validating reset link...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error screen if token is invalid and was provided initially
+  if (initialToken && !tokenValidating && !tokenValid) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+        <View style={styles.backgroundGradient}>
+          <Animated.View style={[styles.backgroundCircle1, { opacity: fadeAnim }]} />
+          <Animated.View style={[styles.backgroundCircle2, { opacity: fadeAnim }]} />
+        </View>
+        <View style={[styles.keyboardView, { justifyContent: 'center', alignItems: 'center', padding: width * 0.06 }]}>
+          <Text style={styles.logo}>❌</Text>
+          <Text style={[styles.welcomeText, { textAlign: 'center', marginTop: 16 }]}>
+            Invalid Reset Link
+          </Text>
+          <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 16 }]}>
+            This password reset link is invalid or has expired. Please request a new one.
+          </Text>
+          <TouchableOpacity
+            style={[styles.loginButton, { marginTop: 32 }]}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginButtonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -236,7 +330,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                 { transform: [{ translateY: slideAnim }] }
               ]}
             >
-              Enter your new password below
+              {initialToken ? 'Enter your new password below' : 'Enter the reset code from your email and new password'}
             </Animated.Text>
           </Animated.View>
 
@@ -250,89 +344,140 @@ const ResetPasswordScreen = ({ navigation, route }) => {
               }
             ]}
           >
-            {/* New Password Input */}
-            <View style={styles.inputContainer}>
-              <Animated.View style={[
-                styles.inputWrapper,
-                newPasswordFocused && styles.inputWrapperFocused,
-                newPassword && styles.inputWrapperFilled
-              ]}>
-                <View style={styles.inputIconContainer}>
-                  <Text style={styles.inputIcon}>🔐</Text>
+            {/* Reset Token Input - Show if no initial token or token is invalid */}
+            {(!initialToken || !tokenValid) && (
+              <View style={styles.inputContainer}>
+                <Animated.View style={[
+                  styles.inputWrapper,
+                  tokenFocused && styles.inputWrapperFocused,
+                  resetToken && styles.inputWrapperFilled,
+                  tokenValid && styles.inputWrapperValid
+                ]}>
+                  <View style={styles.inputIconContainer}>
+                    <Text style={styles.inputIcon}>🔑</Text>
+                  </View>
+                  <View style={styles.inputContent}>
+                    <Text style={[styles.inputLabel, tokenFocused && styles.inputLabelFocused]}>
+                      Reset Code
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter reset code from email"
+                      placeholderTextColor="#9E9E9E"
+                      value={resetToken}
+                      onChangeText={setResetToken}
+                      onFocus={() => setTokenFocused(true)}
+                      onBlur={() => setTokenFocused(false)}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  {resetToken.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => validateToken(resetToken)}
+                      activeOpacity={0.7}
+                    >
+                      {tokenValidating ? (
+                        <ActivityIndicator size="small" color="#4CAF50" />
+                      ) : tokenValid ? (
+                        <Text style={[styles.eyeIcon, { color: '#4CAF50' }]}>✓</Text>
+                      ) : (
+                        <Text style={[styles.eyeIcon, { color: '#FF9800' }]}>⚠</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </Animated.View>
+              </View>
+            )}
+            {/* Password fields - Only show if token is valid or no initial token was provided */}
+            {(tokenValid || !initialToken) && (
+              <>
+                {/* New Password Input */}
+                <View style={styles.inputContainer}>
+                  <Animated.View style={[
+                    styles.inputWrapper,
+                    newPasswordFocused && styles.inputWrapperFocused,
+                    newPassword && styles.inputWrapperFilled
+                  ]}>
+                    <View style={styles.inputIconContainer}>
+                      <Text style={styles.inputIcon}>🔐</Text>
+                    </View>
+                    <View style={styles.inputContent}>
+                      <Text style={[styles.inputLabel, newPasswordFocused && styles.inputLabelFocused]}>
+                        New Password
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter new password"
+                        placeholderTextColor="#9E9E9E"
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        onFocus={() => setNewPasswordFocused(true)}
+                        onBlur={() => setNewPasswordFocused(false)}
+                        secureTextEntry={!showNewPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowNewPassword(!showNewPassword)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showNewPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 </View>
-                <View style={styles.inputContent}>
-                  <Text style={[styles.inputLabel, newPasswordFocused && styles.inputLabelFocused]}>
-                    New Password
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter new password"
-                    placeholderTextColor="#9E9E9E"
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    onFocus={() => setNewPasswordFocused(true)}
-                    onBlur={() => setNewPasswordFocused(false)}
-                    secureTextEntry={!showNewPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.eyeIcon}>{showNewPassword ? '👁️' : '👁️‍🗨️'}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
 
-            {/* Confirm Password Input */}
-            <View style={styles.inputContainer}>
-              <Animated.View style={[
-                styles.inputWrapper,
-                confirmPasswordFocused && styles.inputWrapperFocused,
-                confirmPassword && styles.inputWrapperFilled
-              ]}>
-                <View style={styles.inputIconContainer}>
-                  <Text style={styles.inputIcon}>🔒</Text>
+                {/* Confirm Password Input */}
+                <View style={styles.inputContainer}>
+                  <Animated.View style={[
+                    styles.inputWrapper,
+                    confirmPasswordFocused && styles.inputWrapperFocused,
+                    confirmPassword && styles.inputWrapperFilled
+                  ]}>
+                    <View style={styles.inputIconContainer}>
+                      <Text style={styles.inputIcon}>🔒</Text>
+                    </View>
+                    <View style={styles.inputContent}>
+                      <Text style={[styles.inputLabel, confirmPasswordFocused && styles.inputLabelFocused]}>
+                        Confirm Password
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Confirm new password"
+                        placeholderTextColor="#9E9E9E"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        onFocus={() => setConfirmPasswordFocused(true)}
+                        onBlur={() => setConfirmPasswordFocused(false)}
+                        secureTextEntry={!showConfirmPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 </View>
-                <View style={styles.inputContent}>
-                  <Text style={[styles.inputLabel, confirmPasswordFocused && styles.inputLabelFocused]}>
-                    Confirm Password
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm new password"
-                    placeholderTextColor="#9E9E9E"
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    onFocus={() => setConfirmPasswordFocused(true)}
-                    onBlur={() => setConfirmPasswordFocused(false)}
-                    secureTextEntry={!showConfirmPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+              </>
+            )}
 
             {/* Reset Button */}
             <TouchableOpacity
               style={[
                 styles.loginButton,
                 loading && styles.loginButtonLoading,
-                (!newPassword || !confirmPassword) && styles.loginButtonDisabled
+                (!newPassword || !confirmPassword || !resetToken || (resetToken && !tokenValid)) && styles.loginButtonDisabled
               ]}
               onPress={handleResetPassword}
-              disabled={loading || !newPassword || !confirmPassword}
+              disabled={loading || !newPassword || !confirmPassword || !resetToken || (resetToken && !tokenValid)}
               activeOpacity={0.9}
             >
               <View style={styles.buttonContent}>
@@ -523,6 +668,15 @@ const styles = StyleSheet.create({
   inputWrapperFilled: {
     borderColor: '#81C784',
     backgroundColor: '#FFFFFF',
+  },
+  inputWrapperValid: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E8',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   inputIconContainer: {
     width: 40,

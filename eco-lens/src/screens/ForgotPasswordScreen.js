@@ -104,24 +104,15 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     try {
       // Call API to request password reset
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to send reset email');
-      }
-
-      const data = await response.json();
+      const data = await AuthService.requestPasswordReset(email);
+      
       Alert.alert(
         'Reset Email Sent',
         data.message || 'If this email is registered, a reset link has been sent. Please check your inbox or spam folder.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        [
+          { text: 'OK', onPress: () => navigation.goBack() },
+          { text: 'Enter Reset Code', onPress: () => navigation.navigate('ResetPassword', { token: '' }) }
+        ]
       );
     } catch (error) {
       Alert.alert(
@@ -279,7 +270,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Back to Login */}
+          {/* Sign Up Link */}
           <Animated.View
             style={[
               styles.signUpSection,
@@ -295,6 +286,25 @@ const ForgotPasswordScreen = ({ navigation }) => {
               activeOpacity={0.7}
             >
               <Text style={styles.signUpLink}>Back to Login</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Reset Code Entry Link */}
+          <Animated.View
+            style={[
+              styles.signUpSection,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <Text style={styles.signUpText}>Already have a reset code? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ResetPassword', { token: '' })}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.signUpLink}>Enter Code</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>

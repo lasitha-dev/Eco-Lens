@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -278,14 +279,7 @@ const CustomerDashboard = () => {
       <View style={styles.fixedHeader}>
         {/* App Title */}
         <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>🌿 Eco-Lens</Text>
-            <TouchableOpacity onPress={() => { console.log('Profile icon pressed'); navigation.navigate('MyProfile'); }} style={styles.profileIcon}>
-              <View style={styles.profileCircle}>
-                <Text style={styles.profileText}>👤</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.title}>🌱 Eco-Lens</Text>
           <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
         </View>
 
@@ -356,8 +350,10 @@ const styles = StyleSheet.create({
   
   fixedHeader: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.m,
+    paddingTop: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.l,
+    paddingHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.medium,
@@ -426,8 +422,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.m,
+    marginHorizontal: 0,
+    marginBottom: 0,
     paddingHorizontal: theme.spacing.m,
     borderRadius: theme.borderRadius.round,
     height: 48,
@@ -557,7 +553,7 @@ const styles = StyleSheet.create({
   
   productList: {
     paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   
   gridRow: {
