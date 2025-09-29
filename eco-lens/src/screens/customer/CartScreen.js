@@ -15,6 +15,7 @@ import {
   Image,
   Alert,
   Dimensions,
+  Platform,
 } from 'react-native';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
@@ -220,9 +221,10 @@ const styles = StyleSheet.create({
   
   header: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.m,
+    paddingTop: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.l,
     paddingHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.small,
@@ -244,6 +246,7 @@ const styles = StyleSheet.create({
   cartList: {
     paddingHorizontal: theme.spacing.m,
     paddingTop: theme.spacing.m,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   
   cartItem: {

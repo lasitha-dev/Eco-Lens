@@ -1,11 +1,13 @@
 /**
  * CustomerTabNavigator Component
- * Bottom tab navigation for customer dashboard
+ * Modern bottom tab navigation for customer dashboard
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View, Text, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import CartScreen from '../screens/customer/CartScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
@@ -18,40 +20,56 @@ const CustomerTabNavigator = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarActiveTintColor: theme.colors.textOnPrimary,
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
+        tabBarBackground: () => (
+          <LinearGradient
+            colors={[theme.colors.primaryLight, theme.colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              flex: 1,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+          />
+        ),
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: 'transparent', // Make background transparent to show gradient
           borderTopWidth: 0,
-          elevation: 24,
-          shadowColor: '#000',
+          elevation: 20,
+          shadowColor: theme.colors.shadowDark,
           shadowOffset: {
             width: 0,
-            height: -4,
+            height: -8,
           },
-          shadowOpacity: 0.15,
-          shadowRadius: 12,
-          paddingTop: 12,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-          paddingHorizontal: 8,
-          height: Platform.OS === 'ios' ? 90 : 70,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
+          shadowOpacity: 0.4,
+          shadowRadius: 16,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+          paddingHorizontal: 16,
+          height: Platform.OS === 'ios' ? 92 : 76,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          position: 'absolute',
+          left: 8,
+          right: 8,
+          bottom: 0,
+          // Modern glassmorphism effect
+          backdropFilter: 'blur(20px)',
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
+          fontSize: theme.typography.fontSize.caption,
+          fontWeight: theme.typography.fontWeight.semiBold,
           marginTop: 4,
-          marginBottom: Platform.OS === 'ios' ? 4 : 2,
-          textTransform: 'capitalize',
-        },
-        tabBarIconStyle: {
-          marginTop: 2,
-          marginBottom: -2,
+          marginBottom: 2,
+          letterSpacing: 0.3,
+          fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
         },
         tabBarItemStyle: {
-          paddingVertical: 6,
-          paddingHorizontal: 2,
+          paddingVertical: 8,
+          paddingHorizontal: 6,
+          marginHorizontal: 4,
         },
       }}
     >
@@ -59,46 +77,49 @@ const CustomerTabNavigator = () => {
         name="ProductDashboard"
         component={CustomerDashboard}
         options={{
-          title: 'Products',
+          title: 'Home',
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon 
-              emoji="🌱" 
-              size={size} 
+            <ModernTabIcon
+              iconName="home"
+              size={size}
               focused={focused}
               color={color}
+              label="Home"
             />
           ),
         }}
       />
-      
+
       <Tab.Screen
         name="Cart"
         component={CartScreen}
         options={{
           title: 'Cart',
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon 
-              emoji="🛒" 
-              size={size} 
+            <ModernTabIcon
+              iconName="bag-handle"
+              size={size}
               focused={focused}
               color={color}
+              label="Cart"
             />
           ),
-          tabBarBadge: undefined, // Can be used to show cart item count
+          tabBarBadge: undefined,
         }}
       />
-      
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon 
-              emoji="👤" 
-              size={size} 
+            <ModernTabIcon
+              iconName="person"
+              size={size}
               focused={focused}
               color={color}
+              label="Profile"
             />
           ),
         }}
@@ -107,28 +128,68 @@ const CustomerTabNavigator = () => {
   );
 };
 
-// Custom tab icon component with emoji and focus state
-const TabIcon = ({ emoji, size, focused, color }) => {
+// Modern animated tab icon component
+const ModernTabIcon = ({ iconName, size, focused, color, label }) => {
+  const scaleValue = new Animated.Value(focused ? 1.1 : 1);
+  const opacityValue = new Animated.Value(focused ? 1 : 0.7);
+
+  useEffect(() => {
+    Animated.spring(scaleValue, {
+      toValue: focused ? 1.1 : 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+
+    Animated.timing(opacityValue, {
+      toValue: focused ? 1 : 0.7,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [focused]);
+
   return (
-    <View style={{
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 44,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: focused ? theme.colors.primaryLight : 'transparent',
-      transform: [{ scale: focused ? 1.05 : 1 }],
-    }}>
-      <Text style={{
-        fontSize: focused ? size + 2 : size - 1,
-        opacity: focused ? 1 : 0.75,
-        textShadowColor: focused ? 'rgba(76, 175, 80, 0.3)' : 'transparent',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+    <Animated.View
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        transform: [{ scale: scaleValue }],
+        opacity: opacityValue,
+      }}
+    >
+      <View style={{
+        width: focused ? 48 : 44,
+        height: focused ? 48 : 44,
+        borderRadius: 16,
+        backgroundColor: focused
+          ? 'rgba(255, 255, 255, 0.2)'
+          : 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 2,
+        borderWidth: focused ? 1 : 0,
+        borderColor: focused ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
+        shadowColor: focused ? '#000' : 'transparent',
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: focused ? 0.25 : 0,
+        shadowRadius: 8,
+        elevation: focused ? 6 : 0,
       }}>
-        {emoji}
-      </Text>
-    </View>
+        <Ionicons
+          name={focused ? `${iconName}` : `${iconName}-outline`}
+          size={focused ? size + 4 : size + 2}
+          color={color}
+          style={{
+            textShadowColor: focused ? 'rgba(0, 0, 0, 0.1)' : 'transparent',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 2,
+          }}
+        />
+      </View>
+    </Animated.View>
   );
 };
 

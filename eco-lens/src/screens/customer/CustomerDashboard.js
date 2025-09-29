@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -349,8 +350,10 @@ const styles = StyleSheet.create({
   
   fixedHeader: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.m,
+    paddingTop: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.l,
+    paddingHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.medium,
@@ -387,8 +390,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.m,
+    marginHorizontal: 0,
+    marginBottom: 0,
     paddingHorizontal: theme.spacing.m,
     borderRadius: theme.borderRadius.round,
     height: 48,
@@ -518,7 +521,7 @@ const styles = StyleSheet.create({
   
   productList: {
     paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   
   gridRow: {

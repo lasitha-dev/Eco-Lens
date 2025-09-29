@@ -14,6 +14,7 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
@@ -174,6 +175,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   
   userCard: {
