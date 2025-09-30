@@ -48,13 +48,14 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="Dashboard" component={CustomerTabNavigator} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           </>
         )
       ) : (
         // Non-authenticated screens
         <>
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />

@@ -46,6 +46,28 @@ class ProfileService {
       throw error;
     }
   }
+
+  // Delete profile photo
+  static async deleteProfilePhoto() {
+    try {
+      const headers = await AuthService.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile/delete-photo`, {
+        method: 'POST',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete profile photo');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error deleting profile photo:', error);
+      throw error;
+    }
+  }
 }
 
 export default ProfileService;

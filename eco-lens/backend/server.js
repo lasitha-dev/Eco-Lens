@@ -328,8 +328,12 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        address: user.address,
+        dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().split('T')[0] : null, // Format as YYYY-MM-DD
+        country: user.country,
         phone: user.phone,
-        gender: user.gender
+        gender: user.gender,
+        profilePicture: user.profilePicture
       }
     });
 
@@ -339,25 +343,63 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete profile photo
+app.post('/api/profile/delete-photo', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Update user to remove profile picture
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { profilePicture: null },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Profile photo deleted successfully',
+      user: {
+        id: updatedUser._id,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        address: updatedUser.address,
+        dateOfBirth: updatedUser.dateOfBirth ? updatedUser.dateOfBirth.toISOString().split('T')[0] : null,
+        country: updatedUser.country,
+        phone: updatedUser.phone,
+        gender: updatedUser.gender,
+        profilePicture: updatedUser.profilePicture
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile photo delete error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Update user profile
 app.patch('/api/profile', authenticateToken, async (req, res) => {
   try {
-    const { name, phone, gender, email, password } = req.body;
+    const { firstName, lastName, email, address, dateOfBirth, country, phone, gender, password, profilePicture } = req.body;
     const userId = req.user.id;
 
     // Prepare update object
     const updateData = {};
 
-    if (name) {
-      // Split name into firstName and lastName
-      const nameParts = name.trim().split(' ');
-      updateData.firstName = nameParts[0] || '';
-      updateData.lastName = nameParts.slice(1).join(' ') || '';
-    }
-
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (address !== undefined) updateData.address = address;
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (country !== undefined) updateData.country = country;
     if (phone !== undefined) updateData.phone = phone;
-    if (gender) updateData.gender = gender;
-    if (email) {
+    if (gender !== undefined) updateData.gender = gender;
+    if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
+
+    if (email !== undefined) {
       updateData.email = email.toLowerCase();
       // Check if email is already taken by another user
       const existingUser = await User.findOne({ email: updateData.email, _id: { $ne: userId } });
@@ -395,8 +437,12 @@ app.patch('/api/profile', authenticateToken, async (req, res) => {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
+        address: updatedUser.address,
+        dateOfBirth: updatedUser.dateOfBirth ? updatedUser.dateOfBirth.toISOString().split('T')[0] : null,
+        country: updatedUser.country,
         phone: updatedUser.phone,
-        gender: updatedUser.gender
+        gender: updatedUser.gender,
+        profilePicture: updatedUser.profilePicture
       }
     });
 

@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other', 'prefer-not-to-say'],
     default: 'prefer-not-to-say'
   },
+  profilePicture: {
+    type: String, // URI or URL of the profile picture
+    default: null
+  },
   role: {
     type: String,
     enum: ['customer', 'admin'],
