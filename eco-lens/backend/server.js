@@ -384,7 +384,7 @@ app.post('/api/profile/delete-photo', authenticateToken, async (req, res) => {
 // Update user profile
 app.patch('/api/profile', authenticateToken, async (req, res) => {
   try {
-    const { firstName, lastName, email, address, dateOfBirth, country, phone, gender, password, profilePicture } = req.body;
+    const { firstName, lastName, address, dateOfBirth, country, profilePicture } = req.body;
     const userId = req.user.id;
 
     // Prepare update object
@@ -393,30 +393,39 @@ app.patch('/api/profile', authenticateToken, async (req, res) => {
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
     if (address !== undefined) updateData.address = address;
-    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
     if (country !== undefined) updateData.country = country;
-    if (phone !== undefined) updateData.phone = phone;
-    if (gender !== undefined) updateData.gender = gender;
     if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
 
-    if (email !== undefined) {
-      updateData.email = email.toLowerCase();
-      // Check if email is already taken by another user
-      const existingUser = await User.findOne({ email: updateData.email, _id: { $ne: userId } });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Email already in use by another account' });
+    // Handle dateOfBirth - convert string to Date object if provided
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth === '' || dateOfBirth === null) {
+        updateData.dateOfBirth = null;
+      } else {
+        // Validate and parse the date string (expected format: YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (typeof dateOfBirth === 'string' && dateRegex.test(dateOfBirth)) {
+          // Parse the YYYY-MM-DD format properly
+          const [year, month, day] = dateOfBirth.split('-').map(Number);
+          updateData.dateOfBirth = new Date(year, month - 1, day); // Month is 0-indexed in JavaScript
+          
+          // Validate the date is reasonable (not in the future and user is at least 13 years old)
+          const today = new Date();
+          const minDate = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate()); // 120 years ago
+          const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate()); // 13 years ago
+          
+          if (updateData.dateOfBirth > today) {
+            return res.status(400).json({ error: 'Date of birth cannot be in the future' });
+          }
+          if (updateData.dateOfBirth < minDate) {
+            return res.status(400).json({ error: 'Date of birth is too far in the past' });
+          }
+          if (updateData.dateOfBirth > maxDate) {
+            return res.status(400).json({ error: 'You must be at least 13 years old' });
+          }
+        } else {
+          return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD format' });
+        }
       }
-    }
-
-    if (password) {
-      // Validate password
-      if (!validatePassword(password)) {
-        return res.status(400).json({
-          error: 'Password must contain uppercase letter, number, special character, and be at least 8 characters'
-        });
-      }
-      // Hash new password
-      updateData.password = await bcrypt.hash(password, 12);
     }
 
     // Update user
@@ -440,8 +449,6 @@ app.patch('/api/profile', authenticateToken, async (req, res) => {
         address: updatedUser.address,
         dateOfBirth: updatedUser.dateOfBirth ? updatedUser.dateOfBirth.toISOString().split('T')[0] : null,
         country: updatedUser.country,
-        phone: updatedUser.phone,
-        gender: updatedUser.gender,
         profilePicture: updatedUser.profilePicture
       }
     });

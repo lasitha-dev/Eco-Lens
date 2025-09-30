@@ -180,8 +180,34 @@ const EditProfileScreen = ({ navigation }) => {
     }
   };
 
+  const formatDateOfBirth = (input) => {
+    // Remove all non-digit characters
+    let numbers = input.replace(/[^\d]/g, '');
+    
+    // Limit to 8 digits (YYYYMMDD)
+    if (numbers.length > 8) {
+      numbers = numbers.substring(0, 8);
+    }
+    
+    // Auto-format with dashes
+    if (numbers.length <= 4) {
+      return numbers;
+    } else if (numbers.length <= 6) {
+      return `${numbers.substring(0, 4)}-${numbers.substring(4)}`;
+    } else {
+      return `${numbers.substring(0, 4)}-${numbers.substring(4, 6)}-${numbers.substring(6)}`;
+    }
+  };
+
   const updateFormData = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Special handling for date of birth formatting
+    if (field === 'dateOfBirth') {
+      const formattedValue = formatDateOfBirth(value);
+      setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
