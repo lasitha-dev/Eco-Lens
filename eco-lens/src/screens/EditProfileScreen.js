@@ -14,11 +14,53 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import AuthService from '../api/authService';
 
 const { width, height } = Dimensions.get('window');
+
+// List of countries for dropdown
+const countries = [
+  'United States',
+  'Canada',
+  'United Kingdom',
+  'Australia',
+  'Germany',
+  'France',
+  'Italy',
+  'Spain',
+  'Netherlands',
+  'Sweden',
+  'Norway',
+  'Denmark',
+  'Finland',
+  'Japan',
+  'South Korea',
+  'China',
+  'India',
+  'Brazil',
+  'Mexico',
+  'Argentina',
+  'South Africa',
+  'Egypt',
+  'Turkey',
+  'Russia',
+  'Thailand',
+  'Vietnam',
+  'Indonesia',
+  'Malaysia',
+  'Singapore',
+  'Philippines',
+  'Sri Lanka',
+  'Pakistan',
+  'Bangladesh',
+  'Nepal',
+  'Bhutan',
+  'Maldives',
+  'Other',
+];
 
 const EditProfileScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -109,21 +151,32 @@ const EditProfileScreen = ({ navigation }) => {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        // Update formData with base64 string for backend
-        updateFormData('profilePicture', base64);
+        // Upload to backend immediately
+        const updatedUser = await AuthService.updateProfile({ profilePicture: base64 });
 
-        // Update display URI for immediate showing
-        setDisplayImageUri(`data:image/jpeg;base64,${base64}`);
+        // Update display URI with the uploaded photo from backend
+        if (updatedUser.profilePicture) {
+          if (updatedUser.profilePicture.startsWith('/9j/') || updatedUser.profilePicture.length > 100) {
+            // It's base64, create data URI
+            setDisplayImageUri(`data:image/jpeg;base64,${updatedUser.profilePicture}`);
+          } else {
+            // It's a URL
+            setDisplayImageUri(updatedUser.profilePicture);
+          }
+        }
+
+        // Update formData to reflect the change
+        setFormData(prev => ({ ...prev, profilePicture: updatedUser.profilePicture }));
 
         // Show success feedback
-        Alert.alert('Success', 'Profile picture selected successfully!');
+        Alert.alert('Success', 'Profile picture uploaded successfully!');
       } else {
         // Image selection was cancelled
         console.log('Image selection cancelled');
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', `Failed to select image: ${error.message}`);
+      Alert.alert('Error', `Failed to upload image: ${error.message}`);
     }
   };
 
@@ -164,14 +217,13 @@ const EditProfileScreen = ({ navigation }) => {
     try {
       setSaving(true);
 
-      // Prepare data for update (exclude email as it shouldn't be changed)
+      // Prepare data for update (exclude email and profilePicture as it shouldn't be changed or already updated)
       const updateData = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         address: formData.address.trim(),
         dateOfBirth: formData.dateOfBirth,
         country: formData.country,
-        profilePicture: formData.profilePicture, // Send base64 string to backend
       };
 
       // Call the API to update profile
@@ -326,13 +378,18 @@ const EditProfileScreen = ({ navigation }) => {
             {/* Country */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Country</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your country"
-                value={formData.country}
-                onChangeText={(value) => updateFormData('country', value)}
-                autoCapitalize="words"
-              />
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.country}
+                  onValueChange={(value) => updateFormData('country', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select a country" value="" />
+                  {countries.map((country) => (
+                    <Picker.Item key={country} label={country} value={country} />
+                  ))}
+                </Picker>
+              </View>
             </View>
 
             {/* Save Button */}
@@ -484,6 +541,18 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: Math.min(height * 0.06, 50),
+    color: '#333333',
+    fontSize: Math.min(width * 0.04, 16),
   },
   saveButton: {
     backgroundColor: '#4CAF50',
