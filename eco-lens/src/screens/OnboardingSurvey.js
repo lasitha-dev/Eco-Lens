@@ -21,6 +21,7 @@ import { useAuth } from '../hooks/useAuthLogin';
 import { SURVEY_QUESTIONS, SURVEY_CONFIG } from '../constants/surveyQuestions';
 import theme from '../styles/theme';
 import globalStyles from '../styles/globalStyles';
+import { API_BASE_URL } from '../config/api';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -131,12 +132,26 @@ const OnboardingSurvey = ({ navigation }) => {
     );
   };
 
+  const mapSurveyAnswers = () => {
+    const mappedAnswers = {};
+    SURVEY_QUESTIONS.forEach(question => {
+      let answer;
+      if (question.type === 'multi-select') {
+        answer = answers[question.id] || [];
+      } else {
+        answer = answers[question.id];
+      }
+      mappedAnswers[question.id] = answer;
+    });
+    return mappedAnswers;
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true);
     
     try {
       // Get the API base URL from config
-      const API_BASE_URL = 'http://192.168.8.143:5002/api'; // Use the network IP from logs
+      const { API_BASE_URL } = require('../config/api');
       
       // Get the auth token from the auth context
       const token = auth || user?.token;
@@ -158,16 +173,16 @@ const OnboardingSurvey = ({ navigation }) => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          productInterests: answers[1] || [],
-          shoppingFrequency: answers[2] || 'Occasionally',
-          shoppingPurpose: answers[3] || 'Personal use',
-          priceRange: answers[4] || 'Mid-range',
-          wantsDeals: answers[5] || 'Yes',
-          preferredDevices: answers[6] || ['Mobile'],
-          suggestionType: answers[7] || 'Both',
-          ecoFriendlyPreference: answers[8] || 'Yes',
-          interestedInNewProducts: answers[9] || 'Yes',
-          dashboardCategories: answers[10] || ['Electronics', 'Fashion']
+          productInterests: mapSurveyAnswers()[1] || [],
+          shoppingFrequency: mapSurveyAnswers()[2] || 'Occasionally',
+          shoppingPurpose: mapSurveyAnswers()[3] || 'Personal use',
+          priceRange: mapSurveyAnswers()[4] || 'Mid-range',
+          wantsDeals: mapSurveyAnswers()[5] || 'Yes',
+          preferredDevices: mapSurveyAnswers()[6] || ['Mobile'],
+          suggestionType: mapSurveyAnswers()[7] || 'Both',
+          ecoFriendlyPreference: mapSurveyAnswers()[8] || 'Yes',
+          interestedInNewProducts: mapSurveyAnswers()[9] || 'Yes',
+          dashboardCategories: mapSurveyAnswers()[10] || ['Electronics', 'Fashion']
         }),
       });
 
