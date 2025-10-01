@@ -24,7 +24,10 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header with Profile Picture */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Welcome to Eco-Lens!</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.headerTitle}>🌱 Eco-Lens</Text>
+          <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
+        </View>
         <TouchableOpacity 
           style={styles.profileIcon}
           onPress={() => navigation.navigate('Profile')}
@@ -145,8 +148,9 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginBottom: 40,
     textAlign: 'center',
+    fontStyle: 'italic',
+    paddingLeft: 25, // Move text slightly to the right
   },
   featureCard: {
     backgroundColor: colors.surface,
@@ -190,6 +194,10 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
 });
 

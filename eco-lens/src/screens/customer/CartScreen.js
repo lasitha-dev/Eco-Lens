@@ -259,6 +259,7 @@ const styles = StyleSheet.create({
   
   headerContent: {
     flex: 1,
+    marginRight: theme.spacing.m, // Add spacing to match CustomerDashboard
   },
 
   profileIcon: {
