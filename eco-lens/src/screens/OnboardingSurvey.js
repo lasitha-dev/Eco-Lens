@@ -136,7 +136,7 @@ const OnboardingSurvey = ({ navigation }) => {
     
     try {
       // Get the API base URL from config
-      const API_BASE_URL = 'http://192.168.8.143:5002/api'; // Use the network IP from logs
+      const { API_BASE_URL } = require('../config/api');
       
       // Get the auth token from the auth context
       const token = auth || user?.token;
