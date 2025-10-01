@@ -19,6 +19,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -336,10 +337,32 @@ const CustomerDashboard = ({ navigation }) => {
       
       {/* Fixed Header with Search - Outside of FlatList */}
       <View style={styles.fixedHeader}>
-        {/* App Title */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>🌱 Eco-Lens</Text>
-          <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
+        {/* App Title with Profile Picture */}
+        <View style={styles.titleRow}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>🌱 Eco-Lens</Text>
+            <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileIcon}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <View style={styles.profileCircle}>
+              {user?.profilePicture ? (
+                <Image
+                  source={{ uri: user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100 
+                    ? `data:image/jpeg;base64,${user.profilePicture}` 
+                    : user.profilePicture }}
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.profileText}>
+                  {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Personalized Recommendations Header */}
@@ -509,6 +532,12 @@ const styles = StyleSheet.create({
 
   profileText: {
     fontSize: 20,
+  },
+
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
   },
   
   subtitle: {

@@ -18,6 +18,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import AuthService from '../api/authService';
+import { useAuth } from '../hooks/useAuthLogin'; // Import the auth hook
 
 const { width, height } = Dimensions.get('window');
 
@@ -63,6 +64,7 @@ const countries = [
 ];
 
 const EditProfileScreen = ({ navigation }) => {
+  const { updateUser } = useAuth(); // Get the updateUser function from auth context
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -167,6 +169,9 @@ const EditProfileScreen = ({ navigation }) => {
 
         // Update formData to reflect the change
         setFormData(prev => ({ ...prev, profilePicture: updatedUser.profilePicture }));
+
+        // Update global user state
+        updateUser({ profilePicture: updatedUser.profilePicture });
 
         // Show success feedback
         Alert.alert('Success', 'Profile picture uploaded successfully!');

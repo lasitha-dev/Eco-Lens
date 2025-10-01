@@ -15,6 +15,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Image
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
