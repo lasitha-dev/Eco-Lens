@@ -87,6 +87,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = (updatedUserData) => {
+    const updatedUser = { ...user, ...updatedUserData };
+    setUser(updatedUser);
+    setIsAdmin(updatedUser.role === 'admin');
+    setIsCustomer(updatedUser.role === 'customer');
+  };
+
   const checkAdminAccess = () => {
     if (!auth || !user) {
       throw new Error('Not authenticated');
@@ -115,6 +122,7 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     setAuth,
     logout,
+    updateUser,
     checkAdminAccess,
     checkCustomerAccess,
     // Helper methods

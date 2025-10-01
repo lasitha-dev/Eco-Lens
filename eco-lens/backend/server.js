@@ -10,6 +10,7 @@ const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
 const { authenticateToken } = require('./middleware/auth');
+const surveyRoutes = require('./routes/surveyRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -328,8 +329,12 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        address: user.address,
+        dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().split('T')[0] : null, // Format as YYYY-MM-DD
+        country: user.country,
         phone: user.phone,
-        gender: user.gender
+        gender: user.gender,
+        profilePicture: user.profilePicture
       }
     });
 
@@ -339,42 +344,89 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete profile photo
+app.post('/api/profile/delete-photo', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Update user to remove profile picture
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { profilePicture: null },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Profile photo deleted successfully',
+      user: {
+        id: updatedUser._id,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        address: updatedUser.address,
+        dateOfBirth: updatedUser.dateOfBirth ? updatedUser.dateOfBirth.toISOString().split('T')[0] : null,
+        country: updatedUser.country,
+        phone: updatedUser.phone,
+        gender: updatedUser.gender,
+        profilePicture: updatedUser.profilePicture
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile photo delete error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Update user profile
 app.patch('/api/profile', authenticateToken, async (req, res) => {
   try {
-    const { name, phone, gender, email, password } = req.body;
+    const { firstName, lastName, address, dateOfBirth, country, profilePicture } = req.body;
     const userId = req.user.id;
 
     // Prepare update object
     const updateData = {};
 
-    if (name) {
-      // Split name into firstName and lastName
-      const nameParts = name.trim().split(' ');
-      updateData.firstName = nameParts[0] || '';
-      updateData.lastName = nameParts.slice(1).join(' ') || '';
-    }
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (address !== undefined) updateData.address = address;
+    if (country !== undefined) updateData.country = country;
+    if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
 
-    if (phone !== undefined) updateData.phone = phone;
-    if (gender) updateData.gender = gender;
-    if (email) {
-      updateData.email = email.toLowerCase();
-      // Check if email is already taken by another user
-      const existingUser = await User.findOne({ email: updateData.email, _id: { $ne: userId } });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Email already in use by another account' });
+    // Handle dateOfBirth - convert string to Date object if provided
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth === '' || dateOfBirth === null) {
+        updateData.dateOfBirth = null;
+      } else {
+        // Validate and parse the date string (expected format: YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (typeof dateOfBirth === 'string' && dateRegex.test(dateOfBirth)) {
+          // Parse the YYYY-MM-DD format properly
+          const [year, month, day] = dateOfBirth.split('-').map(Number);
+          updateData.dateOfBirth = new Date(year, month - 1, day); // Month is 0-indexed in JavaScript
+          
+          // Validate the date is reasonable (not in the future and user is at least 13 years old)
+          const today = new Date();
+          const minDate = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate()); // 120 years ago
+          const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate()); // 13 years ago
+          
+          if (updateData.dateOfBirth > today) {
+            return res.status(400).json({ error: 'Date of birth cannot be in the future' });
+          }
+          if (updateData.dateOfBirth < minDate) {
+            return res.status(400).json({ error: 'Date of birth is too far in the past' });
+          }
+          if (updateData.dateOfBirth > maxDate) {
+            return res.status(400).json({ error: 'You must be at least 13 years old' });
+          }
+        } else {
+          return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD format' });
+        }
       }
-    }
-
-    if (password) {
-      // Validate password
-      if (!validatePassword(password)) {
-        return res.status(400).json({
-          error: 'Password must contain uppercase letter, number, special character, and be at least 8 characters'
-        });
-      }
-      // Hash new password
-      updateData.password = await bcrypt.hash(password, 12);
     }
 
     // Update user
@@ -395,8 +447,10 @@ app.patch('/api/profile', authenticateToken, async (req, res) => {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
-        phone: updatedUser.phone,
-        gender: updatedUser.gender
+        address: updatedUser.address,
+        dateOfBirth: updatedUser.dateOfBirth ? updatedUser.dateOfBirth.toISOString().split('T')[0] : null,
+        country: updatedUser.country,
+        profilePicture: updatedUser.profilePicture
       }
     });
 
@@ -470,6 +524,9 @@ app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
+
+// Survey Routes
+app.use('/api/survey', surveyRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

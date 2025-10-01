@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { colors } from '../constants/colors';
 import { useAuth } from '../hooks/useAuthLogin';
 
 const HomeScreen = ({ navigation }) => {
-  const { auth, setAuth } = useAuth();
+  const { auth, setAuth, user } = useAuth();
 
   // Protect this screen - redirect to Welcome if not authenticated
   useEffect(() => {
@@ -22,8 +22,35 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with Profile Picture */}
+      <View style={styles.header}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.headerTitle}>🌱 Eco-Lens</Text>
+          <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.profileIcon}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <View style={styles.profileCircle}>
+            {user?.profilePicture ? (
+              <Image
+                source={{ uri: user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100 
+                  ? `data:image/jpeg;base64,${user.profilePicture}` 
+                  : user.profilePicture }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.profileText}>
+                {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to Eco-Lens!</Text>
         <Text style={styles.subtitle}>Your sustainable shopping journey starts here</Text>
         
         <View style={styles.featureCard}>
@@ -64,6 +91,47 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  profileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileCircle: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+  profileText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textLight,
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -80,8 +148,9 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginBottom: 40,
     textAlign: 'center',
+    fontStyle: 'italic',
+    paddingLeft: 25, // Move text slightly to the right
   },
   featureCard: {
     backgroundColor: colors.surface,
@@ -125,6 +194,10 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
 });
 

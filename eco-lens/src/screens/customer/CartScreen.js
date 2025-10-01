@@ -20,10 +20,12 @@ import {
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
+import { useAuth } from '../../hooks/useAuthLogin';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const CartScreen = ({ navigation }) => {
+  const { user } = useAuth();
   // Mock cart data - in a real app this would come from state management
   const [cartItems, setCartItems] = useState([]);
 
@@ -156,8 +158,30 @@ const CartScreen = ({ navigation }) => {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>🛒 Shopping Cart</Text>
-        <Text style={styles.subtitle}>Review your eco-friendly selections</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>🛒 Shopping Cart</Text>
+          <Text style={styles.subtitle}>Review your eco-friendly selections</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.profileIcon}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <View style={styles.profileCircle}>
+            {user?.profilePicture ? (
+              <Image
+                source={{ uri: user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100 
+                  ? `data:image/jpeg;base64,${user.profilePicture}` 
+                  : user.profilePicture }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.profileText}>
+                {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
 
       {cartItems.length === 0 ? (
@@ -228,6 +252,39 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.small,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  
+  headerContent: {
+    flex: 1,
+    marginRight: theme.spacing.m, // Add spacing to match CustomerDashboard
+  },
+
+  profileIcon: {
+    padding: theme.spacing.s,
+  },
+
+  profileCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+
+  profileText: {
+    fontSize: theme.typography.fontSize.h5,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.textOnPrimary,
   },
   
   title: {

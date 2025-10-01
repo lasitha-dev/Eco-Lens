@@ -15,6 +15,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Image
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
@@ -23,15 +24,29 @@ import globalStyles from '../../styles/globalStyles';
 const { width: screenWidth } = Dimensions.get('window');
 
 const ProfileScreen = ({ navigation }) => {
-  const { 
-    user, 
-    logout, 
-    getUserName, 
-    getUserEmail, 
-    getUserRole 
+  const {
+    user,
+    logout,
+    getUserName,
+    getUserEmail,
+    getUserRole
   } = useAuth();
 
+  // Get profile picture display logic
+  const getProfilePicture = () => {
+    if (user?.profilePicture) {
+      // If it's base64, create data URI
+      if (user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100) {
+        return `data:image/jpeg;base64,${user.profilePicture}`;
+      } else {
+        return user.profilePicture;
+      }
+    }
+    return null; // Will show default avatar
+  };
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
 
   // Handle logout with confirmation
   const handleLogout = () => {
@@ -71,7 +86,7 @@ const ProfileScreen = ({ navigation }) => {
       subtitle: 'View and edit your profile',
       icon: '👤',
       iconColor: '#4CAF50',
-      onPress: () => Alert.alert('Coming Soon', 'Account information editing will be available in a future update.'),
+      onPress: () => navigation.navigate('EditProfile'),
     },
     {
       id: 'orders',
@@ -123,9 +138,17 @@ const ProfileScreen = ({ navigation }) => {
         {/* User Info Card */}
         <View style={styles.userCard}>
           <View style={styles.userAvatar}>
-            <Text style={styles.userAvatarText}>
-              {getUserName() ? getUserName().charAt(0).toUpperCase() : 'N'}
-            </Text>
+            {getProfilePicture() ? (
+              <Image
+                source={{ uri: getProfilePicture() }}
+                style={styles.userAvatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.userAvatarText}>
+                {getUserName() ? getUserName().charAt(0).toUpperCase() : 'N'}
+              </Text>
+            )}
           </View>
           
           <View style={styles.userInfo}>
@@ -148,6 +171,7 @@ const ProfileScreen = ({ navigation }) => {
             {profileMenuItems.map(renderMenuItem)}
           </View>
         </View>
+
 
         {/* Logout Button */}
         <TouchableOpacity
@@ -200,6 +224,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+
+  userAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
   
   userInfo: {

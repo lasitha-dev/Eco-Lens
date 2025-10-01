@@ -50,7 +50,7 @@ const MyProfileScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             await setAuth(null);
-            navigation.navigate('Welcome');
+            navigation.navigate('Login');
           },
         },
       ]

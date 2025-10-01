@@ -3,216 +3,439 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
   TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
+  KeyboardAvoidingView,
+  TextInput,
+  Alert,
+  Dimensions,
   Platform,
-  ActionSheetIOS,
+  Image,
 } from 'react-native';
-import theme from '../styles/theme';
-import Button from '../components/ButtonLogin';
-import Input from '../components/InputLogin';
-import ProfileService from '../api/profileService';
+import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import AuthService from '../api/authService';
+import { useAuth } from '../hooks/useAuthLogin'; // Import the auth hook
 
-const EditProfileScreen = ({ navigation, route }) => {
-  const { profile } = route.params || {};
+const { width, height } = Dimensions.get('window');
 
+// List of countries for dropdown
+const countries = [
+  'United States',
+  'Canada',
+  'United Kingdom',
+  'Australia',
+  'Germany',
+  'France',
+  'Italy',
+  'Spain',
+  'Netherlands',
+  'Sweden',
+  'Norway',
+  'Denmark',
+  'Finland',
+  'Japan',
+  'South Korea',
+  'China',
+  'India',
+  'Brazil',
+  'Mexico',
+  'Argentina',
+  'South Africa',
+  'Egypt',
+  'Turkey',
+  'Russia',
+  'Thailand',
+  'Vietnam',
+  'Indonesia',
+  'Malaysia',
+  'Singapore',
+  'Philippines',
+  'Sri Lanka',
+  'Pakistan',
+  'Bangladesh',
+  'Nepal',
+  'Bhutan',
+  'Maldives',
+  'Other',
+];
+
+const EditProfileScreen = ({ navigation }) => {
+  const { updateUser } = useAuth(); // Get the updateUser function from auth context
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
-    phone: '',
-    gender: '',
-    password: '',
+    address: '',
+    dateOfBirth: '',
+    country: '',
+    profilePicture: null, // Will store base64 string for backend
   });
+
+  const [displayImageUri, setDisplayImageUri] = useState(null); // For immediate display
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
 
+  // Load user profile data on component mount
   useEffect(() => {
-    if (profile) {
-      setFormData({
-        name: `${profile.firstName} ${profile.lastName}`.trim(),
-        email: profile.email || '',
-        phone: profile.phone || '',
-        gender: profile.gender || '',
-        password: '',
-      });
-    }
-  }, [profile]);
+    loadUserProfile();
+  }, []);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      const userData = await AuthService.getUserProfile();
+      setFormData({
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        email: userData.email || '',
+        address: userData.address || '',
+        dateOfBirth: userData.dateOfBirth || '',
+        country: userData.country || '',
+        profilePicture: userData.profilePicture || null,
+      });
+
+      // Set display image URI
+      if (userData.profilePicture) {
+        if (userData.profilePicture.startsWith('/9j/') || userData.profilePicture.length > 100) {
+          // It's base64, create data URI
+          setDisplayImageUri(`data:image/jpeg;base64,${userData.profilePicture}`);
+        } else {
+          // It's a URL
+          setDisplayImageUri(userData.profilePicture);
+        }
+      } else {
+        setDisplayImageUri(null);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      Alert.alert('Error', 'Failed to load profile data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const showGenderPicker = () => {
-    const options = ['Male', 'Female', 'Other', 'Prefer not to say', 'Cancel'];
-    const values = ['male', 'female', 'other', 'prefer-not-to-say', null];
+  // Handle profile picture selection
+  const pickImage = async () => {
+    try {
+      // Request permission to access media library
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: 4,
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== 4) {
-            handleInputChange('gender', values[buttonIndex]);
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Permission to access media library is required to select a profile picture.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Settings', onPress: () => ImagePicker.requestMediaLibraryPermissionsAsync() }
+          ]
+        );
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1], // Square aspect ratio for profile pictures
+        quality: 0.8, // Good quality but not too large
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImageUri = result.assets[0].uri;
+
+        // Convert image to base64 for backend storage
+        const base64 = await FileSystem.readAsStringAsync(selectedImageUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Upload to backend immediately
+        const updatedUser = await AuthService.updateProfile({ profilePicture: base64 });
+
+        // Update display URI with the uploaded photo from backend
+        if (updatedUser.profilePicture) {
+          if (updatedUser.profilePicture.startsWith('/9j/') || updatedUser.profilePicture.length > 100) {
+            // It's base64, create data URI
+            setDisplayImageUri(`data:image/jpeg;base64,${updatedUser.profilePicture}`);
+          } else {
+            // It's a URL
+            setDisplayImageUri(updatedUser.profilePicture);
           }
         }
-      );
+
+        // Update formData to reflect the change
+        setFormData(prev => ({ ...prev, profilePicture: updatedUser.profilePicture }));
+
+        // Update global user state
+        updateUser({ profilePicture: updatedUser.profilePicture });
+
+        // Show success feedback
+        Alert.alert('Success', 'Profile picture uploaded successfully!');
+      } else {
+        // Image selection was cancelled
+        console.log('Image selection cancelled');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', `Failed to upload image: ${error.message}`);
+    }
+  };
+
+  const formatDateOfBirth = (input) => {
+    // Remove all non-digit characters
+    let numbers = input.replace(/[^\d]/g, '');
+    
+    // Limit to 8 digits (YYYYMMDD)
+    if (numbers.length > 8) {
+      numbers = numbers.substring(0, 8);
+    }
+    
+    // Auto-format with dashes
+    if (numbers.length <= 4) {
+      return numbers;
+    } else if (numbers.length <= 6) {
+      return `${numbers.substring(0, 4)}-${numbers.substring(4)}`;
     } else {
-      Alert.alert(
-        'Select Gender',
-        '',
-        options.map((option, index) => ({
-          text: option,
-          onPress: () => {
-            if (index !== 4) {
-              handleInputChange('gender', values[index]);
-            }
-          },
-          style: index === 4 ? 'cancel' : 'default',
-        }))
-      );
+      return `${numbers.substring(0, 4)}-${numbers.substring(4, 6)}-${numbers.substring(6)}`;
+    }
+  };
+
+  const updateFormData = (field, value) => {
+    // Special handling for date of birth formatting
+    if (field === 'dateOfBirth') {
+      const formattedValue = formatDateOfBirth(value);
+      setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Name is required');
-      return false;
+    const newErrors = {};
+
+    // Basic validation for required fields
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
     }
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Email is required');
-      return false;
+      newErrors.email = 'Email is required';
     }
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
+    if (!formData.address.trim()) {
+      newErrors.address = 'Address is required';
     }
-    if (formData.password && formData.password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters long');
-      return false;
-    }
-    return true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       setSaving(true);
 
-      // Prepare data for API (only send changed fields)
+      // Prepare data for update (exclude email and profilePicture as it shouldn't be changed or already updated)
       const updateData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        gender: formData.gender,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        address: formData.address.trim(),
+        dateOfBirth: formData.dateOfBirth,
+        country: formData.country,
       };
 
-      // Only include password if it's not empty
-      if (formData.password.trim()) {
-        updateData.password = formData.password;
-      }
+      // Call the API to update profile
+      const updatedUser = await AuthService.updateProfile(updateData);
 
-      const updatedProfile = await ProfileService.updateProfile(updateData);
+      // Reload profile data to ensure we have the latest from backend
+      await loadUserProfile();
 
-      Alert.alert('Success', 'Profile updated successfully', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate back to profile screen with updated data
-            navigation.navigate('MyProfile');
-          },
-        },
-      ]);
+      Alert.alert(
+        'Success',
+        'Profile updated successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Edit Profile</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <Input
-              value={formData.name}
-              onChangeText={(value) => handleInputChange('name', value)}
-              placeholder="Enter your full name"
-              autoCapitalize="words"
-            />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Edit Profile</Text>
+            <View style={styles.placeholder} />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <Input
-              value={formData.email}
-              onChangeText={(value) => handleInputChange('email', value)}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+          {/* Profile Picture Section */}
+          <View style={styles.profilePictureSection}>
+            <TouchableOpacity
+              style={styles.profilePictureContainer}
+              onPress={pickImage}
+            >
+              <Image
+                source={
+                  displayImageUri
+                    ? { uri: displayImageUri }
+                    : require('../../assets/icon.png') // Default placeholder
+                }
+                style={styles.profilePicture}
+                resizeMode="cover"
+              />
+              {/* Camera icon overlay */}
+              <View style={styles.cameraIcon}>
+                <Text style={styles.cameraIconText}>📷</Text>
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.profilePictureHint}>
+              Tap to change profile picture
+            </Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone</Text>
-            <Input
-              value={formData.phone}
-              onChangeText={(value) => handleInputChange('phone', value)}
-              placeholder="Enter your phone number"
-              keyboardType="phone-pad"
-            />
-          </View>
+          {/* Form Fields */}
+          <View style={styles.formSection}>
+            {/* First Name */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>First Name *</Text>
+              <TextInput
+                style={[styles.input, errors.firstName && styles.inputError]}
+                placeholder="Enter your first name"
+                value={formData.firstName}
+                onChangeText={(value) => updateFormData('firstName', value)}
+                autoCapitalize="words"
+              />
+              {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Gender</Text>
-            <TouchableOpacity style={styles.pickerContainer} onPress={showGenderPicker}>
-              <Text style={styles.pickerText}>
-                {formData.gender ? (
-                  formData.gender === 'prefer-not-to-say' ? 'Prefer not to say' :
-                  formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1)
-                ) : 'Select Gender'}
+            {/* Last Name */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Last Name *</Text>
+              <TextInput
+                style={[styles.input, errors.lastName && styles.inputError]}
+                placeholder="Enter your last name"
+                value={formData.lastName}
+                onChangeText={(value) => updateFormData('lastName', value)}
+                autoCapitalize="words"
+              />
+              {errors.lastName && <Text style={styles.errorText}>{errors.lastName}</Text>}
+            </View>
+
+            {/* Email (Read-only) */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                style={[styles.input, styles.readOnlyInput]}
+                placeholder="Your email address"
+                value={formData.email}
+                editable={false}
+                selectTextOnFocus={false}
+              />
+              <Text style={styles.hintText}>Email address cannot be changed</Text>
+            </View>
+
+            {/* Address */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Address *</Text>
+              <TextInput
+                style={[styles.input, errors.address && styles.inputError]}
+                placeholder="Enter your address"
+                value={formData.address}
+                onChangeText={(value) => updateFormData('address', value)}
+                multiline
+                numberOfLines={2}
+              />
+              {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+            </View>
+
+            {/* Date of Birth */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Date of Birth</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={formData.dateOfBirth}
+                onChangeText={(value) => updateFormData('dateOfBirth', value)}
+              />
+            </View>
+
+            {/* Country */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Country</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.country}
+                  onValueChange={(value) => updateFormData('country', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select a country" value="" />
+                  {countries.map((country) => (
+                    <Picker.Item key={country} label={country} value={country} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              <Text style={styles.saveButtonText}>
+                {saving ? 'Saving...' : 'Save Changes'}
               </Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>New Password (optional)</Text>
-            <Input
-              value={formData.password}
-              onChangeText={(value) => handleInputChange('password', value)}
-              placeholder="Leave blank to keep current password"
-              secureTextEntry
-            />
-            <Text style={styles.hint}>
-              Password must be at least 8 characters with uppercase, number, and special character
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          {saving ? (
-            <View style={styles.savingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={styles.savingText}>Saving...</Text>
-            </View>
-          ) : (
-            <Button title="Save Changes" onPress={handleSave} />
-          )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -220,66 +443,179 @@ const EditProfileScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#FFFFFF',
   },
-  scrollView: {
+  keyboardAvoidingView: {
     flex: 1,
   },
-  content: {
-    padding: theme.spacing.m,
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: width * 0.06,
   },
-  title: {
-    fontSize: theme.typography.fontSize.h2,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: height * 0.02,
+    marginBottom: height * 0.04,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: 20,
+    color: '#2E7D32',
+  },
+  headerTitle: {
+    fontSize: Math.min(width * 0.06, 24),
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  placeholder: {
+    width: 40,
+  },
+  profilePictureSection: {
+    alignItems: 'center',
+    marginBottom: height * 0.04,
+  },
+  profilePictureContainer: {
+    position: 'relative',
+  },
+  profilePicture: {
+    width: Math.min(width * 0.35, 140), // Responsive size, max 140px
+    height: Math.min(width * 0.35, 140),
+    borderRadius: Math.min(width * 0.35, 140) / 2, // Perfect circle
+    borderWidth: 4,
+    borderColor: '#2E7D32',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#2E7D32',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  cameraIconText: {
+    fontSize: 18,
+  },
+  profilePictureHint: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#666666',
     textAlign: 'center',
-    marginBottom: theme.spacing.xl,
+    fontWeight: '500',
   },
-  form: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.m,
-    padding: theme.spacing.m,
-    ...theme.shadows.small,
+  formSection: {
+    paddingBottom: height * 0.05,
   },
-  inputGroup: {
-    marginBottom: theme.spacing.l,
+  inputContainer: {
+    marginBottom: 20,
   },
-  label: {
-    fontSize: theme.typography.fontSize.body1,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+  inputLabel: {
+    fontSize: Math.min(width * 0.04, 16),
+    fontWeight: '600',
+    color: '#2E7D32',
+    marginBottom: 8,
   },
-  hint: {
-    fontSize: theme.typography.fontSize.caption,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
+  input: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: Math.min(height * 0.015, 12),
+    fontSize: Math.min(width * 0.04, 16),
+    backgroundColor: '#FAFAFA',
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+  },
+  readOnlyInput: {
+    backgroundColor: '#F5F5F5',
+    color: '#666666',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: Math.min(width * 0.035, 14),
+    marginTop: 4,
+  },
+  hintText: {
+    fontSize: Math.min(width * 0.03, 12),
+    color: '#666666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.s,
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.m,
-    justifyContent: 'center',
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    overflow: 'hidden',
   },
-  pickerText: {
-    fontSize: theme.typography.fontSize.body1,
-    color: theme.colors.text,
+  picker: {
+    height: Math.min(height * 0.06, 50),
+    color: '#333333',
+    fontSize: Math.min(width * 0.04, 16),
   },
-  buttonContainer: {
-    marginTop: theme.spacing.xl,
+  saveButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: Math.min(height * 0.02, 16),
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    marginTop: 20,
   },
-  savingContainer: {
-    flexDirection: 'row',
+  saveButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: Math.min(width * 0.05, 20),
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.m,
   },
-  savingText: {
-    marginLeft: theme.spacing.s,
-    fontSize: theme.typography.fontSize.body1,
-    color: theme.colors.textSecondary,
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
   },
 });
 
