@@ -14,6 +14,7 @@ import MyProfileScreen from '../screens/MyProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import OnboardingSurvey from '../screens/OnboardingSurvey';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +49,8 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="Dashboard" component={CustomerTabNavigator} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            {/* Onboarding Survey */}
+             <Stack.Screen name="OnboardingSurvey" component={OnboardingSurvey} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           </>
         )
