@@ -11,6 +11,8 @@ const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -527,6 +529,42 @@ app.use('/api/products', productRoutes);
 
 // Survey Routes
 app.use('/api/survey', surveyRoutes);
+
+// OAuth Configuration
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: `${process.env.BASE_URL}/api/auth/google/callback`
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const existingUser = await User.findOne({ googleId: profile.id });
+    if (existingUser) {
+      return done(null, existingUser);
+    }
+
+    const newUser = new User({
+      firstName: profile.name.givenName,
+      lastName: profile.name.familyName,
+      email: profile.emails[0].value,
+      googleId: profile.id,
+      role: 'customer'
+    });
+
+    await newUser.save();
+    done(null, newUser);
+  } catch (error) {
+    done(error, null);
+  }
+}));
+
+app.get('/api/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get('/api/auth/google/callback', passport.authenticate('google', { failureRedirect: '/api/auth/login' }),
+  (req, res) => {
+    const token = generateToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL}/auth/google-callback?token=${token}`);
+  }
+);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
