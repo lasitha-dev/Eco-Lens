@@ -19,6 +19,9 @@ import AuthService from '../api/authService';
 import SurveyService from '../api/surveyService';
 import { useAuth } from '../hooks/useAuthLogin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 
 const { width, height } = Dimensions.get('window');
 
@@ -29,6 +32,8 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [googleAuthRequest, setGoogleAuthRequest] = useState(null);
+  const [googleAuthResponse, setGoogleAuthResponse] = useState(null);
   const { setAuth } = useAuth();
 
   // Animation values
@@ -78,6 +83,15 @@ const LoginScreen = ({ navigation }) => {
 
     return () => pulseAnimation.stop();
   }, []);
+
+  useEffect(() => {
+    if (googleAuthRequest && googleAuthResponse) {
+      const { code } = googleAuthResponse;
+      if (code) {
+        handleGoogleLogin(code);
+      }
+    }
+  }, [googleAuthRequest, googleAuthResponse]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -168,6 +182,63 @@ const LoginScreen = ({ navigation }) => {
 
   const handleForgotPassword = () => {
     navigation.navigate('ForgotPassword');
+  };
+
+  const handleGoogleLogin = async (code) => {
+    try {
+      const result = await AuthService.googleLogin(code);
+      console.log('Google login successful:', result);
+      
+      // Set auth context with the result
+      await setAuth(result);
+      
+      // Navigate based on user role
+      if (result.user.role === 'admin') {
+        console.log('✅ Admin login - redirecting to AdminDashboard');
+        navigation.navigate('AdminDashboard');
+      } else {
+        // Check if customer has completed or skipped the survey
+        try {
+          // First check if user has completed or skipped the survey locally
+          const surveyCompleted = await AsyncStorage.getItem('@eco_lens_survey_completed');
+          const surveySkipped = await AsyncStorage.getItem('@eco_lens_survey_skipped');
+          
+          if (surveyCompleted === 'true') {
+            console.log('✅ Customer login - survey was completed, redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+            return;
+          }
+          
+          if (surveySkipped === 'true') {
+            console.log('✅ Customer login - survey was skipped, redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+            return;
+          }
+
+          // Check survey completion status from server
+          const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
+          console.log('Survey status:', surveyStatus);
+          
+          if (!surveyStatus.completed) {
+            console.log('✅ Customer login - redirecting to OnboardingSurvey');
+            navigation.navigate('OnboardingSurvey');
+          } else {
+            console.log('✅ Customer login - redirecting to Dashboard');
+            navigation.navigate('Dashboard');
+          }
+        } catch (error) {
+          console.error('Error checking survey status:', error);
+          // If survey check fails, go to dashboard
+          navigation.navigate('Dashboard');
+        }
+      }
+    } catch (error) {
+      Alert.alert(
+        'Google Login Failed',
+        error.message || 'Unable to sign in with Google. Please try again.',
+        [{ text: 'Try Again', style: 'default' }]
+      );
+    }
   };
 
   const logoRotateInterpolate = logoRotate.interpolate({
@@ -359,6 +430,27 @@ const LoginScreen = ({ navigation }) => {
                 </Text>
               </View>
               <View style={styles.buttonGlow} />
+            </TouchableOpacity>
+
+            {/* Google Sign In Button */}
+            <TouchableOpacity
+              style={styles.googleSignInButton}
+              onPress={() => {
+                setGoogleAuthRequest({
+                  clientId: 'YOUR_GOOGLE_CLIENT_ID', // Replace with your actual client ID
+                  redirectUri: 'YOUR_REDIRECT_URI', // Replace with your actual redirect URI
+                  scopes: ['profile', 'email'],
+                });
+              }}
+              activeOpacity={0.9}
+            >
+              <View style={styles.googleSignInButtonContent}>
+                <View style={styles.googleIconContainer}>
+                  <Text style={styles.googleIcon}>🔗</Text>
+                </View>
+                <Text style={styles.googleSignInButtonText}>Sign in with Google</Text>
+              </View>
+              <View style={styles.googleSignInButtonGlow} />
             </TouchableOpacity>
           </Animated.View>
 
@@ -651,6 +743,51 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   buttonGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+  },
+  googleSignInButton: {
+    position: 'relative',
+    backgroundColor: '#4285F4',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#3367D6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+    marginTop: 15,
+  },
+  googleSignInButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconContainer: {
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  googleIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  googleSignInButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  googleSignInButtonGlow: {
     position: 'absolute',
     top: 0,
     left: 0,

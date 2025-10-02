@@ -416,6 +416,49 @@ class AuthService {
       throw error;
     }
   }
+
+  // Google OAuth login
+  static async googleOAuthLogin(code) {
+    try {
+      console.log(`Logging in with Google OAuth at: ${API_BASE_URL}/auth/google`);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Google OAuth login failed');
+      }
+
+      const data = await response.json();
+      
+      // Store authentication data
+      await this.storeAuth(data.token, data.user);
+      
+      console.log(`✅ Google OAuth login successful for ${data.user.role}: ${data.user.email}`);
+      
+      return {
+        ...data,
+        isAdmin: data.user.role === 'admin',
+        isCustomer: data.user.role === 'customer'
+      };
+    } catch (error) {
+      console.error('Error logging in with Google OAuth:', error);
+      
+      // Provide helpful network troubleshooting info
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection and ensure your device and computer are on the same WiFi network.');
+      }
+      
+      throw error;
+    }
+  }
 }
 
 export default AuthService;
