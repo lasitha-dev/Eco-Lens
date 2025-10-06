@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthService from '../api/authService';
+import CartService from '../api/cartService';
 
 const AuthContext = createContext();
 
@@ -10,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCustomer, setIsCustomer] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   // Load stored authentication on app start
   useEffect(() => {
@@ -55,9 +57,15 @@ export const AuthProvider = ({ children }) => {
         setUser(authData.user);
         setIsAdmin(authData.user.role === 'admin');
         setIsCustomer(authData.user.role === 'customer');
-        
+
         // Store authentication data
         await AuthService.storeAuth(authData.token, authData.user);
+
+        // Load cart count for customers
+        if (authData.user.role === 'customer') {
+          await updateCartCount();
+        }
+
         console.log(`✅ Authenticated ${authData.user.role}:`, authData.user.email);
       } else {
         // Logout case
@@ -65,7 +73,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAdmin(false);
         setIsCustomer(false);
-        
+        setCartCount(0);
+
         // Clear stored authentication data
         await AuthService.clearAuth();
         console.log('✅ Logged out successfully');
@@ -94,6 +103,24 @@ export const AuthProvider = ({ children }) => {
     setIsCustomer(updatedUser.role === 'customer');
   };
 
+  const updateCartCount = async () => {
+    if (user?.id && isCustomer) {
+      try {
+        const count = await CartService.getCartItemCount(user.id);
+        setCartCount(count);
+      } catch (error) {
+        console.error('Error updating cart count:', error);
+        setCartCount(0);
+      }
+    } else {
+      setCartCount(0);
+    }
+  };
+
+  const refreshCartCount = () => {
+    updateCartCount();
+  };
+
   const checkAdminAccess = () => {
     if (!auth || !user) {
       throw new Error('Not authenticated');
@@ -120,9 +147,11 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isCustomer,
     isLoading,
+    cartCount,
     setAuth,
     logout,
     updateUser,
+    refreshCartCount,
     checkAdminAccess,
     checkCustomerAccess,
     // Helper methods

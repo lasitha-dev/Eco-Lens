@@ -15,6 +15,10 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import OnboardingSurvey from '../screens/OnboardingSurvey';
+import CheckoutScreen from '../screens/customer/CheckoutScreen';
+import PaymentSuccessScreen from '../screens/customer/PaymentSuccessScreen';
+import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
+import OrderDetailScreen from '../screens/customer/OrderDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +56,11 @@ const AppNavigator = () => {
             {/* Onboarding Survey */}
              <Stack.Screen name="OnboardingSurvey" component={OnboardingSurvey} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            {/* E-commerce screens */}
+            <Stack.Screen name="Checkout" component={CheckoutScreen} />
+            <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
+            <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
+            <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
           </>
         )
       ) : (

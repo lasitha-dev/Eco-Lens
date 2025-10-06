@@ -11,11 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import CartScreen from '../screens/customer/CartScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
+import { useAuth } from '../hooks/useAuthLogin';
 import theme from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
 const CustomerTabNavigator = () => {
+  const { cartCount } = useAuth();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -104,7 +107,7 @@ const CustomerTabNavigator = () => {
               label="Cart"
             />
           ),
-          tabBarBadge: undefined,
+          tabBarBadge: cartCount > 0 ? cartCount : undefined,
         }}
       />
 

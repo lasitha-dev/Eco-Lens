@@ -7,8 +7,12 @@ require('dotenv').config();
 
 const User = require('./models/User');
 const Product = require('./models/Product');
+const Cart = require('./models/Cart');
+const Order = require('./models/Order');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 
@@ -524,6 +528,12 @@ app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
+
+// Cart Routes
+app.use('/api/cart', cartRoutes);
+
+// Order Routes
+app.use('/api/order', orderRoutes);
 
 // Survey Routes
 app.use('/api/survey', surveyRoutes);

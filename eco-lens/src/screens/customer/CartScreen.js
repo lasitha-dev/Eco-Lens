@@ -3,7 +3,7 @@
  * Shopping cart screen for customer purchases
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,52 +16,97 @@ import {
   Alert,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
 import { useAuth } from '../../hooks/useAuthLogin';
+import CartService from '../../api/cartService';
+import OrderService from '../../api/orderService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const CartScreen = ({ navigation }) => {
-  const { user } = useAuth();
-  // Mock cart data - in a real app this would come from state management
+  const { user, refreshCartCount } = useAuth();
   const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+
+  // Load cart data on component mount
+  useEffect(() => {
+    loadCart();
+  }, [user]);
+
+  // Function to load cart from API
+  const loadCart = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const cartData = await CartService.getCart(user.id);
+      setCartItems(cartData.items || []);
+    } catch (error) {
+      console.error('Error loading cart:', error);
+      Alert.alert('Error', 'Failed to load cart. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to update item quantity
-  const updateQuantity = (itemId, newQuantity) => {
+  const updateQuantity = async (productId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeItem(itemId);
+      removeItem(productId);
       return;
     }
-    
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-    );
+
+    try {
+      setUpdating(true);
+      await CartService.updateCartItem(user.id, productId, newQuantity);
+      // Reload cart to get updated data
+      await loadCart();
+      // Refresh cart count in navigation
+      refreshCartCount();
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      Alert.alert('Error', 'Failed to update item quantity. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   // Function to remove item from cart
-  const removeItem = (itemId) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const removeItem = async (productId) => {
+    try {
+      setUpdating(true);
+      await CartService.removeFromCart(user.id, productId);
+      // Reload cart to get updated data
+      await loadCart();
+      // Refresh cart count in navigation
+      refreshCartCount();
+    } catch (error) {
+      console.error('Error removing item:', error);
+      Alert.alert('Error', 'Failed to remove item. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   // Calculate total price
   const calculateTotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cartItems.reduce((total, item) => total + (item.productId.price * item.quantity), 0);
   };
 
   // Calculate total eco score (weighted average)
   const calculateEcoScore = () => {
     if (cartItems.length === 0) return 0;
-    
+
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const weightedScore = cartItems.reduce((sum, item) => 
-      sum + (item.sustainabilityScore * item.quantity), 0
+    const weightedScore = cartItems.reduce((sum, item) =>
+      sum + (item.productId.sustainabilityScore * item.quantity), 0
     );
-    
+
     return Math.round(weightedScore / totalItems);
   };
 
@@ -71,63 +116,65 @@ const CartScreen = ({ navigation }) => {
       Alert.alert('Empty Cart', 'Please add some items to your cart before checkout.');
       return;
     }
-    
-    Alert.alert(
-      'Checkout',
-      'This feature is not implemented yet. In a full app, this would proceed to payment.',
-      [{ text: 'OK' }]
-    );
+
+    navigation.navigate('Checkout');
   };
 
   // Render cart item
-  const renderCartItem = ({ item }) => (
-    <View style={styles.cartItem}>
-      <Image source={{ uri: item.image }} style={styles.itemImage} />
-      
-      <View style={styles.itemDetails}>
-        <View style={styles.itemHeader}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {item.name}
+  const renderCartItem = ({ item }) => {
+    const product = item.productId;
+    return (
+      <View style={styles.cartItem}>
+        <Image source={{ uri: product.image }} style={styles.itemImage} />
+
+        <View style={styles.itemDetails}>
+          <View style={styles.itemHeader}>
+            <Text style={styles.itemName} numberOfLines={2}>
+              {product.name}
+            </Text>
+            <EcoGradeBadge grade={product.sustainabilityGrade} size="small" />
+          </View>
+
+          <Text style={styles.itemCategory}>{product.category}</Text>
+          <Text style={styles.itemPrice}>${product.price.toFixed(2)} each</Text>
+
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity
+              style={[styles.quantityButton, updating && styles.disabledButton]}
+              onPress={() => !updating && updateQuantity(product._id, item.quantity - 1)}
+              disabled={updating}
+            >
+              <Text style={styles.quantityButtonText}>-</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.quantityText}>{item.quantity}</Text>
+
+            <TouchableOpacity
+              style={[styles.quantityButton, updating && styles.disabledButton]}
+              onPress={() => !updating && updateQuantity(product._id, item.quantity + 1)}
+              disabled={updating}
+            >
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.removeButton, updating && styles.disabledButton]}
+              onPress={() => !updating && removeItem(product._id)}
+              disabled={updating}
+            >
+              <Text style={styles.removeButtonText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.itemTotal}>
+          <Text style={styles.itemTotalText}>
+            ${(product.price * item.quantity).toFixed(2)}
           </Text>
-          <EcoGradeBadge grade={item.sustainabilityGrade} size="small" />
-        </View>
-        
-        <Text style={styles.itemCategory}>{item.category}</Text>
-        <Text style={styles.itemPrice}>${item.price.toFixed(2)} each</Text>
-        
-        <View style={styles.quantityContainer}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
-          >
-            <Text style={styles.quantityButtonText}>-</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity + 1)}
-          >
-            <Text style={styles.quantityButtonText}>+</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => removeItem(item.id)}
-          >
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </TouchableOpacity>
         </View>
       </View>
-      
-      <View style={styles.itemTotal}>
-        <Text style={styles.itemTotalText}>
-          ${(item.price * item.quantity).toFixed(2)}
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   // Render empty cart
   const renderEmptyCart = () => (
@@ -189,13 +236,20 @@ const CartScreen = ({ navigation }) => {
       ) : (
         <>
           {/* Cart Items */}
-          <FlatList
-            data={cartItems}
-            renderItem={renderCartItem}
-            keyExtractor={(item) => `${item.id}-${item.quantity}`}
-            contentContainerStyle={styles.cartList}
-            showsVerticalScrollIndicator={false}
-          />
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Loading cart...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={cartItems}
+              renderItem={renderCartItem}
+              keyExtractor={(item) => `${item.productId._id}-${item.quantity}`}
+              contentContainerStyle={styles.cartList}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
 
           {/* Cart Summary */}
           <View style={styles.summaryContainer}>
@@ -514,6 +568,23 @@ const styles = StyleSheet.create({
     color: theme.colors.textOnPrimary,
     fontSize: theme.typography.fontSize.body1,
     fontWeight: theme.typography.fontWeight.bold,
+  },
+
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+
+  loadingText: {
+    marginTop: theme.spacing.m,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.textSecondary,
   },
 });
 

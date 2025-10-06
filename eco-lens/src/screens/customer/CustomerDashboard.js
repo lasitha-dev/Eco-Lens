@@ -26,6 +26,7 @@ import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import ProductService from '../../api/productService';
 import SurveyService from '../../api/surveyService';
+import CartService from '../../api/cartService';
 import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
@@ -33,7 +34,7 @@ import globalStyles from '../../styles/globalStyles';
 const { width: screenWidth } = Dimensions.get('window');
 
 const CustomerDashboard = ({ navigation }) => {
-  const { user, auth } = useAuth();
+  const { user, auth, refreshCartCount } = useAuth();
   
   // State management
   const [products, setProducts] = useState([]);
@@ -58,14 +59,22 @@ const CustomerDashboard = ({ navigation }) => {
   }, []);
 
   // Handle add to cart
-  const handleAddToCart = useCallback((product, quantity) => {
-    Alert.alert(
-      'Added to Cart',
-      `${quantity} × ${product.name} added to your cart!`,
-      [{ text: 'OK' }]
-    );
-    setIsModalVisible(false);
-  }, []);
+  const handleAddToCart = useCallback(async (product, quantity) => {
+    try {
+      await CartService.addToCart(product._id || product.id, quantity);
+      Alert.alert(
+        'Added to Cart',
+        `${quantity} × ${product.name} added to your cart!`,
+        [{ text: 'OK' }]
+      );
+      setIsModalVisible(false);
+      // Refresh cart count in the navigation badge
+      refreshCartCount();
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+    }
+  }, [refreshCartCount]);
 
   // Load products and personalized recommendations on component mount
   useEffect(() => {
