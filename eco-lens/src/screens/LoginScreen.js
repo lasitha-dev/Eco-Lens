@@ -19,9 +19,9 @@ import AuthService from '../api/authService';
 import SurveyService from '../api/surveyService';
 import { useAuth } from '../hooks/useAuthLogin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { useAuth } from '../hooks/useAuthLogin';
+import { Linking } from 'react-native';
+import { API_BASE_URL } from '../config/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,8 +32,6 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const [googleAuthRequest, setGoogleAuthRequest] = useState(null);
-  const [googleAuthResponse, setGoogleAuthResponse] = useState(null);
   const { setAuth } = useAuth();
 
   // Animation values
@@ -184,61 +182,9 @@ const LoginScreen = ({ navigation }) => {
     navigation.navigate('ForgotPassword');
   };
 
-  const handleGoogleLogin = async (code) => {
-    try {
-      const result = await AuthService.googleLogin(code);
-      console.log('Google login successful:', result);
-      
-      // Set auth context with the result
-      await setAuth(result);
-      
-      // Navigate based on user role
-      if (result.user.role === 'admin') {
-        console.log('✅ Admin login - redirecting to AdminDashboard');
-        navigation.navigate('AdminDashboard');
-      } else {
-        // Check if customer has completed or skipped the survey
-        try {
-          // First check if user has completed or skipped the survey locally
-          const surveyCompleted = await AsyncStorage.getItem('@eco_lens_survey_completed');
-          const surveySkipped = await AsyncStorage.getItem('@eco_lens_survey_skipped');
-          
-          if (surveyCompleted === 'true') {
-            console.log('✅ Customer login - survey was completed, redirecting to Dashboard');
-            navigation.navigate('Dashboard');
-            return;
-          }
-          
-          if (surveySkipped === 'true') {
-            console.log('✅ Customer login - survey was skipped, redirecting to Dashboard');
-            navigation.navigate('Dashboard');
-            return;
-          }
-
-          // Check survey completion status from server
-          const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
-          console.log('Survey status:', surveyStatus);
-          
-          if (!surveyStatus.completed) {
-            console.log('✅ Customer login - redirecting to OnboardingSurvey');
-            navigation.navigate('OnboardingSurvey');
-          } else {
-            console.log('✅ Customer login - redirecting to Dashboard');
-            navigation.navigate('Dashboard');
-          }
-        } catch (error) {
-          console.error('Error checking survey status:', error);
-          // If survey check fails, go to dashboard
-          navigation.navigate('Dashboard');
-        }
-      }
-    } catch (error) {
-      Alert.alert(
-        'Google Login Failed',
-        error.message || 'Unable to sign in with Google. Please try again.',
-        [{ text: 'Try Again', style: 'default' }]
-      );
-    }
+  const handleGoogleLogin = () => {
+    const googleAuthUrl = `${API_BASE_URL}/auth/google`;
+    Linking.openURL(googleAuthUrl);
   };
 
   const logoRotateInterpolate = logoRotate.interpolate({

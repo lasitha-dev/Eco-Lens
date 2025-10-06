@@ -25,8 +25,17 @@ const Navigation = () => {
     return <LoadingSplash />;
   }
 
+  const linking = {
+    prefixes: ['ecolens://'],
+    config: {
+      screens: {
+        GoogleAuthCallback: 'auth/google-callback',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
       <AppNavigator />
       <StatusBar style="auto" />
     </NavigationContainer>

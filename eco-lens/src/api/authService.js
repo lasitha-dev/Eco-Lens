@@ -332,7 +332,7 @@ class AuthService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to reset password');
+        throw new Error(errorData..message || 'Failed to reset password');
       }
 
       const data = await response.json();
@@ -417,45 +417,26 @@ class AuthService {
     }
   }
 
-  // Google OAuth login
-  static async googleOAuthLogin(code) {
+  // Handle Google redirect
+  static async handleGoogleRedirect(url) {
     try {
-      console.log(`Logging in with Google OAuth at: ${API_BASE_URL}/auth/google`);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Google OAuth login failed');
+      const token = url.split('token=')[1];
+      if (!token) {
+        throw new Error('Token not found in URL');
       }
 
-      const data = await response.json();
-      
-      // Store authentication data
-      await this.storeAuth(data.token, data.user);
-      
-      console.log(`✅ Google OAuth login successful for ${data.user.role}: ${data.user.email}`);
-      
-      return {
-        ...data,
-        isAdmin: data.user.role === 'admin',
-        isCustomer: data.user.role === 'customer'
-      };
+      // Store the token
+      await AsyncStorage.setItem(this.TOKEN_KEY, token);
+
+      // Fetch user profile with the new token
+      const user = await this.getUserProfile();
+
+      // Store user data
+      await this.storeAuth(token, user);
+
+      return { token, user };
     } catch (error) {
-      console.error('Error logging in with Google OAuth:', error);
-      
-      // Provide helpful network troubleshooting info
-      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
-        throw new Error('Unable to connect to server. Please check your network connection and ensure your device and computer are on the same WiFi network.');
-      }
-      
+      console.error('Error handling Google redirect:', error);
       throw error;
     }
   }
