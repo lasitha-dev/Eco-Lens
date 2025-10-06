@@ -9,6 +9,7 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const favoritesRoutes = require('./routes/favoritesRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 
@@ -524,6 +525,9 @@ app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
+
+// Favorites Routes
+app.use('/api/favorites', favoritesRoutes);
 
 // Survey Routes
 app.use('/api/survey', surveyRoutes);

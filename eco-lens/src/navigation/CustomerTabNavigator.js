@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import CartScreen from '../screens/customer/CartScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
+import FavoritesScreen from '../screens/customer/FavoritesScreen';
 import theme from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
@@ -105,6 +106,23 @@ const CustomerTabNavigator = () => {
             />
           ),
           tabBarBadge: undefined,
+        }}
+      />
+
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Favorites',
+          tabBarIcon: ({ color, size, focused }) => (
+            <ModernTabIcon
+              iconName="star"
+              size={size}
+              focused={focused}
+              color={color}
+              label="Favorites"
+            />
+          ),
         }}
       />
 

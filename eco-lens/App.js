@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
+import { FavoritesProvider } from "./src/hooks/useFavorites";
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Simple loading splash component
@@ -26,10 +27,12 @@ const Navigation = () => {
   }
 
   return (
-    <NavigationContainer>
-      <AppNavigator />
-      <StatusBar style="auto" />
-    </NavigationContainer>
+    <FavoritesProvider>
+      <NavigationContainer>
+        <AppNavigator />
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </FavoritesProvider>
   );
 };
 
