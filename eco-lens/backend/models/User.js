@@ -23,16 +23,16 @@ const userSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    required: true,
+    default: 'Not provided', // For Google OAuth users
     trim: true
   },
   dateOfBirth: {
     type: Date,
-    required: true
+    default: Date.now // For Google OAuth users
   },
   country: {
     type: String,
-    required: true
+    default: 'Not provided' // For Google OAuth users
   },
   password: {
     type: String,

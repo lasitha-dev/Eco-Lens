@@ -14,14 +14,27 @@ import {
   Alert,
   Animated,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import AuthService from '../api/authService';
 import SurveyService from '../api/surveyService';
 import { useAuth } from '../hooks/useAuthLogin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../hooks/useAuthLogin';
-import { Linking } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { API_BASE_URL } from '../config/api';
+import Constants from 'expo-constants';
+import oauthDebug from '../utils/oauthDebug';
+
+// Extract the functions from the default import
+const { debugOAuthConfig, extractTokensFromUrl } = oauthDebug;
+
+// Test imports
+console.log('=== LoginScreen Imports ===');
+console.log('Constants available:', !!Constants);
+console.log('Platform:', Platform.OS || 'Not available');
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,7 +45,101 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [oauthReady, setOauthReady] = useState(false);
   const { setAuth } = useAuth();
+
+  // Debug OAuth configuration
+  useEffect(() => {
+    const debugInfo = debugOAuthConfig();
+    console.log('OAuth Debug Info:', debugInfo);
+    
+    // Check if OAuth is properly configured
+    const isConfigured = !!(debugInfo.envVars.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || 
+                           debugInfo.envVars.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || 
+                           debugInfo.envVars.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS);
+    
+    setOauthReady(isConfigured);
+  }, []);
+
+  // Check if environment variables are properly set, with fallbacks
+  const googleWebClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+  const googleAndroidClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+  const googleIosClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+
+  useEffect(() => {
+    // Log environment variables for debugging (remove in production)
+    console.log('Google OAuth Environment Variables:');
+    console.log('Web Client ID:', process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ? 'SET' : 'NOT SET (using fallback)');
+    console.log('Android Client ID:', process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID ? 'SET' : 'NOT SET (using fallback)');
+    console.log('iOS Client ID:', process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ? 'SET' : 'NOT SET');
+    
+    // Warn if critical environment variables are missing
+    if (!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB) {
+      console.warn('EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB is not set! Using fallback value.');
+    }
+    if (!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID) {
+      console.warn('EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID is not set! Using fallback value.');
+    }
+  }, []);
+
+  // Create auth request config based on the current platform
+  const getAuthConfig = () => {
+    // For Expo Go, we need to explicitly set the redirect URI to use Expo's auth proxy
+    const config = {
+      clientId: googleWebClientId, // Required for all platforms
+      scopes: ['openid', 'profile', 'email'], // Essential scopes for ID token
+      responseType: 'id_token', // Explicitly request ID token
+      prompt: 'consent', // Force consent screen
+      useProxy: true, // Use Expo's auth proxy
+    };
+    
+    // Add platform-specific client IDs
+    if (googleWebClientId) {
+      config.webClientId = googleWebClientId;
+    }
+    
+    if (googleAndroidClientId) {
+      config.androidClientId = googleAndroidClientId;
+    }
+    
+    // Only add iOS client ID if it's set
+    if (googleIosClientId) {
+      config.iosClientId = googleIosClientId;
+    }
+    
+    // For mobile platforms, explicitly set the redirect URI to use Expo's auth proxy
+    if (Platform.OS !== 'web') {
+      config.redirectUri = 'https://auth.expo.io/@coder_lasitha/eco-lens';
+    }
+    
+    return config;
+  };
+
+  const authConfig = getAuthConfig();
+  const [request, response, promptAsync] = Google.useAuthRequest(authConfig);
+
+  // Log the config for debugging
+  useEffect(() => {
+    console.log('=== GOOGLE AUTH CONFIGURATION ===');
+    console.log('Platform:', Platform.OS);
+    console.log('Config:', JSON.stringify(authConfig, null, 2));
+    console.log('================================');
+    
+    // Log the redirect URI that Expo AuthSession will use
+    if (request) {
+      console.log('Expo AuthSession redirect URI:', request.redirectUri);
+      console.log('Expo AuthSession discovery document:', request.discoveryDocument);
+    }
+  }, [request, authConfig]);
+
+  // Log the request for debugging
+  useEffect(() => {
+    console.log('Google Auth Request initialized:', !!request);
+    if (request) {
+      console.log('Discovery document:', request);
+      console.log('Redirect URI from request:', request.redirectUri);
+    }
+  }, [request]);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -40,6 +147,144 @@ const LoginScreen = ({ navigation }) => {
   const logoScale = useRef(new Animated.Value(0.5)).current;
   const logoRotate = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    console.log('Google Auth Response updated:', response);
+    if (response?.type === 'success') {
+      const { authentication, url } = response;
+      console.log('Google Auth Success - Authentication object:', !!authentication);
+      console.log('Response URL:', url);
+      
+      // Log the full response for debugging
+      console.log('Full response object:', JSON.stringify(response, null, 2));
+      
+      // Try multiple methods to get the ID token
+      let idToken = null;
+      
+      // Method 1: Check if it's in the authentication object
+      if (authentication?.idToken) {
+        console.log('ID Token found in authentication object');
+        idToken = authentication.idToken;
+      }
+      // Method 2: Extract from URL using our utility function
+      else if (url) {
+        console.log('Attempting to extract token from URL using utility function...');
+        const { idToken: extractedIdToken } = extractTokensFromUrl(url);
+        if (extractedIdToken) {
+          console.log('Successfully extracted ID Token from URL');
+          idToken = extractedIdToken;
+        } else {
+          console.log('No ID token found in URL');
+        }
+      }
+      
+      // If we have an ID token, use it
+      if (idToken) {
+        console.log('Calling handleGoogleSignIn with ID token');
+        handleGoogleSignIn(idToken);
+      }
+      // Fallback to access token if ID token is not available
+      else if (authentication?.accessToken) {
+        console.log('Access Token present, but ID Token is missing');
+        console.log('This might be a configuration issue with Google OAuth');
+        handleGoogleSignInWithAccessToken(authentication.accessToken);
+      } else {
+        console.log('No ID token or access token available');
+        Alert.alert(
+          'Google Sign-In Error', 
+          'Failed to get authentication token from Google. This might be due to OAuth configuration issues.'
+        );
+        setLoading(false);
+      }
+    } else if (response?.type === 'error') {
+      console.log('Google Sign-In error:', response.error);
+      setLoading(false);
+      Alert.alert('Google Sign-In Error', response.error?.message || 'An error occurred during Google sign-in');
+    } else if (response?.type === 'dismiss') {
+      console.log('Google Sign-In dismissed');
+      setLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleSignIn = async (idToken) => {
+    setLoading(true);
+    try {
+      console.log('Attempting Google login with ID token');
+      const result = await AuthService.googleLogin(idToken);
+      console.log('Google login successful:', result);
+      await setAuth(result);
+      
+      if (result.user.role === 'admin') {
+        navigation.navigate('AdminDashboard');
+      } else {
+        try {
+          const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
+          if (!surveyStatus.completed) {
+            navigation.navigate('OnboardingSurvey');
+          } else {
+            navigation.navigate('Dashboard');
+          }
+        } catch (surveyError) {
+          console.error('Error checking survey status:', surveyError);
+          navigation.navigate('Dashboard');
+        }
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      Alert.alert(
+        'Google Sign-In Failed', 
+        error.message || 'An error occurred during Google sign-in. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback method to handle access token
+  const handleGoogleSignInWithAccessToken = async (accessToken) => {
+    setLoading(true);
+    try {
+      console.log('Attempting to get user info with access token');
+      
+      // Try to get user info from Google API using access token
+      const userInfoResponse = await fetch(
+        `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`
+      );
+      
+      if (!userInfoResponse.ok) {
+        throw new Error('Failed to get user info from Google');
+      }
+      
+      const userInfo = await userInfoResponse.json();
+      console.log('User info from Google:', userInfo);
+      
+      // Create a custom ID token-like object for our backend
+      // Note: This is not a real ID token, but we can extract the needed info
+      const fakeIdToken = btoa(JSON.stringify({
+        iss: 'https://accounts.google.com',
+        sub: userInfo.sub,
+        aud: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+        email: userInfo.email,
+        email_verified: userInfo.email_verified,
+        name: userInfo.name,
+        given_name: userInfo.given_name,
+        family_name: userInfo.family_name,
+        picture: userInfo.picture
+      }));
+      
+      console.log('Created fake ID token, calling handleGoogleSignIn');
+      await handleGoogleSignIn(fakeIdToken);
+    } catch (error) {
+      console.error('Error getting user info with access token:', error);
+      Alert.alert(
+        'Google Sign-In Failed', 
+        'Failed to authenticate with Google. Please try again.'
+      );
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Entrance animations
@@ -81,15 +326,6 @@ const LoginScreen = ({ navigation }) => {
 
     return () => pulseAnimation.stop();
   }, []);
-
-  useEffect(() => {
-    if (googleAuthRequest && googleAuthResponse) {
-      const { code } = googleAuthResponse;
-      if (code) {
-        handleGoogleLogin(code);
-      }
-    }
-  }, [googleAuthRequest, googleAuthResponse]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -182,9 +418,81 @@ const LoginScreen = ({ navigation }) => {
     navigation.navigate('ForgotPassword');
   };
 
-  const handleGoogleLogin = () => {
-    const googleAuthUrl = `${API_BASE_URL}/auth/google`;
-    Linking.openURL(googleAuthUrl);
+  const handleGoogleLogin = async () => {
+    console.log('=== INITIATING GOOGLE LOGIN ===');
+    console.log('Platform:', Platform.OS);
+    console.log('Current request state:', !!request);
+    console.log('Auth config being used:', JSON.stringify(authConfig, null, 2));
+    console.log('===============================');
+    
+    // Log the redirect URI that will be used
+    if (request) {
+      console.log('Redirect URI that will be used:', request.redirectUri);
+    }
+    
+    // Additional debugging for OAuth flow
+    console.log('🔍 DEBUG INFO FOR OAUTH FLOW:');
+    console.log('🔍 Expo Username:', 'coder_lasitha');
+    console.log('🔍 App Slug:', 'eco-lens');
+    console.log('🔍 Full Redirect URI:', `https://auth.expo.io/@coder_lasitha/eco-lens`);
+    console.log('🔍 Web Client ID:', authConfig.webClientId?.substring(0, 30) + '...');
+    console.log('🔍 Android Client ID:', authConfig.androidClientId?.substring(0, 30) + '...');
+    
+    // Platform-specific checks
+    if (Platform.OS === 'android' && !authConfig.androidClientId) {
+      Alert.alert(
+        'Configuration Error', 
+        'Google OAuth Android Client ID is not configured. Please check EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID in your .env file.'
+      );
+      return;
+    }
+    
+    if (Platform.OS === 'ios' && !authConfig.iosClientId) {
+      Alert.alert(
+        'Configuration Error', 
+        'Google OAuth iOS Client ID is not configured. Please set up iOS OAuth in Google Cloud Console and add EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS to your .env file.'
+      );
+      return;
+    }
+    
+    if (!authConfig.clientId && !authConfig.webClientId) {
+      Alert.alert(
+        'Configuration Error', 
+        'Google OAuth is not properly configured. Please check environment variables.'
+      );
+      return;
+    }
+    
+    if (loading) {
+      console.log('Login already in progress, ignoring request');
+      return;
+    }
+    
+    if (!request) {
+      Alert.alert('Login Not Ready', 'Google login is still initializing. Please wait a moment and try again.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      console.log('Calling promptAsync...');
+      const result = await promptAsync();
+      console.log('promptAsync result:', result);
+      
+      // Handle the result immediately
+      if (result?.type === 'dismiss') {
+        console.log('Google Sign-In dismissed by user');
+        setLoading(false);
+      } else if (result?.type === 'error') {
+        console.log('Google Sign-In error:', result);
+        setLoading(false);
+        Alert.alert('Login Error', 'Failed to complete Google login: ' + (result.params?.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error initiating Google login:', error);
+      Alert.alert('Login Error', 'Failed to initiate Google login: ' + (error.message || 'Unknown error'));
+      setLoading(false);
+    }
   };
 
   const logoRotateInterpolate = logoRotate.interpolate({
@@ -380,21 +688,21 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Google Sign In Button */}
             <TouchableOpacity
-              style={styles.googleSignInButton}
-              onPress={() => {
-                setGoogleAuthRequest({
-                  clientId: 'YOUR_GOOGLE_CLIENT_ID', // Replace with your actual client ID
-                  redirectUri: 'YOUR_REDIRECT_URI', // Replace with your actual redirect URI
-                  scopes: ['profile', 'email'],
-                });
-              }}
+              style={[
+                styles.googleSignInButton,
+                loading && styles.googleSignInButtonDisabled
+              ]}
+              onPress={handleGoogleLogin}
+              disabled={loading}
               activeOpacity={0.9}
             >
               <View style={styles.googleSignInButtonContent}>
                 <View style={styles.googleIconContainer}>
-                  <Text style={styles.googleIcon}>🔗</Text>
+                  <Text style={styles.googleIcon}>G</Text>
                 </View>
-                <Text style={styles.googleSignInButtonText}>Sign in with Google</Text>
+                <Text style={styles.googleSignInButtonText}>
+                  {loading ? 'Signing In with Google...' : 'Sign in with Google'}
+                </Text>
               </View>
               <View style={styles.googleSignInButtonGlow} />
             </TouchableOpacity>
@@ -665,6 +973,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     overflow: 'hidden',
+    marginBottom: 15,
   },
   loginButtonLoading: {
     backgroundColor: '#66BB6A',
@@ -710,7 +1019,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     overflow: 'hidden',
-    marginTop: 15,
+  },
+  googleSignInButtonDisabled: {
+    backgroundColor: '#A0C6FF',
   },
   googleSignInButtonContent: {
     flexDirection: 'row',
@@ -726,6 +1037,7 @@ const styles = StyleSheet.create({
   googleIcon: {
     fontSize: 24,
     color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   googleSignInButtonText: {
     color: '#FFFFFF',

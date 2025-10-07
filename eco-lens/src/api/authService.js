@@ -210,6 +210,78 @@ class AuthService {
     }
   }
 
+  static async googleLogin(idToken) {
+    try {
+      console.log(`Logging in with Google at: ${API_BASE_URL}/auth/google/token`);
+      console.log('ID Token length:', idToken ? idToken.length : 'No token provided');
+      
+      // Check if idToken is provided
+      if (!idToken) {
+        throw new Error('Google ID token is missing. This might be due to OAuth configuration issues.');
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/auth/google/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      console.log('Google login response status:', response.status);
+      console.log('Google login response headers:', [...response.headers.entries()]);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Google login server error:', errorData);
+        
+        // Provide more specific error messages
+        if (response.status === 400) {
+          throw new Error('Invalid Google token. Please try signing in again.');
+        } else if (response.status === 401) {
+          throw new Error('Authentication failed. Please check your Google account permissions.');
+        } else if (response.status === 500) {
+          throw new Error('Server error during Google authentication. Please try again later.');
+        }
+        
+        throw new Error(errorData.error || `Google login failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Google login response data:', data);
+      await this.storeAuth(data.token, data.user);
+      console.log(`✅ Google login successful for ${data.user.email}`);
+      return {
+        ...data,
+        isAdmin: data.user.role === 'admin',
+        isCustomer: data.user.role === 'customer'
+      };
+    } catch (error) {
+      console.error('Error with Google login:', error);
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      throw error;
+    }
+  }
+
+  // Handle Google redirect URL (for web flow)
+  static async handleGoogleRedirect(url) {
+    try {
+      // Extract token from URL if needed
+      // This is typically not needed with Expo AuthSession as the token is in the response
+      console.log('Handling Google redirect URL:', url);
+      
+      // For now, we'll just throw an error as this shouldn't be called
+      // with the Expo AuthSession flow
+      throw new Error('Direct URL handling not implemented for Expo AuthSession flow');
+    } catch (error) {
+      console.error('Error handling Google redirect:', error);
+      throw error;
+    }
+  }
+
   // Logout user
   static async logoutUser() {
     try {
@@ -332,7 +404,7 @@ class AuthService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData..message || 'Failed to reset password');
+        throw new Error(errorData.message || 'Failed to reset password');
       }
 
       const data = await response.json();
@@ -413,30 +485,6 @@ class AuthService {
       return data.user;
     } catch (error) {
       console.error('Error deleting profile photo:', error);
-      throw error;
-    }
-  }
-
-  // Handle Google redirect
-  static async handleGoogleRedirect(url) {
-    try {
-      const token = url.split('token=')[1];
-      if (!token) {
-        throw new Error('Token not found in URL');
-      }
-
-      // Store the token
-      await AsyncStorage.setItem(this.TOKEN_KEY, token);
-
-      // Fetch user profile with the new token
-      const user = await this.getUserProfile();
-
-      // Store user data
-      await this.storeAuth(token, user);
-
-      return { token, user };
-    } catch (error) {
-      console.error('Error handling Google redirect:', error);
       throw error;
     }
   }

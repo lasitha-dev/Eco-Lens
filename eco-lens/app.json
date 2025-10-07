@@ -35,8 +35,19 @@
       },
       "apiUrl": "http://localhost:5002/api",
       "apiPort": "5002",
-      "mobileApiUrl": "http://10.38.245.146:5002/api"
+      "mobileApiUrl": "http://10.38.245.146:5002/api",
+      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com",
+      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com",
+      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com"
     },
-    "scheme": "eco-lens"
+    "scheme": "eco-lens",
+    "plugins": [
+      "expo-web-browser"
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ]
   }
 }
