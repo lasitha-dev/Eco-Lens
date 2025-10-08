@@ -84,33 +84,34 @@ const LoginScreen = ({ navigation }) => {
 
   // Create auth request config based on the current platform
   const getAuthConfig = () => {
-    // For Expo Go, we need to explicitly set the redirect URI to use Expo's auth proxy
+    // Use Web Client ID for all platforms
     const config = {
-      clientId: googleWebClientId, // Required for all platforms
-      scopes: ['openid', 'profile', 'email'], // Essential scopes for ID token
-      responseType: 'id_token', // Explicitly request ID token
-      prompt: 'consent', // Force consent screen
-      useProxy: true, // Use Expo's auth proxy
+      clientId: googleWebClientId,
+      scopes: ['openid', 'profile', 'email'],
+      responseType: 'id_token',
     };
     
-    // Add platform-specific client IDs
-    if (googleWebClientId) {
-      config.webClientId = googleWebClientId;
+    // Platform-specific redirect configuration
+    if (Platform.OS === 'web') {
+      config.redirectUri = 'http://localhost:8081';
+      config.useProxy = false;
+    } else {
+      // For mobile, explicitly set the Expo auth proxy redirect URI
+      // Format: https://auth.expo.io/@USERNAME/SLUG
+      const expoUsername = 'coder_lasitha';
+      const appSlug = Constants.expoConfig?.slug || 'eco-lens';
+      config.redirectUri = `https://auth.expo.io/@${expoUsername}/${appSlug}`;
+      config.useProxy = true;
+      
+      console.log('Using Expo auth proxy redirect:', config.redirectUri);
     }
     
-    if (googleAndroidClientId) {
-      config.androidClientId = googleAndroidClientId;
-    }
-    
-    // Only add iOS client ID if it's set
-    if (googleIosClientId) {
-      config.iosClientId = googleIosClientId;
-    }
-    
-    // For mobile platforms, explicitly set the redirect URI to use Expo's auth proxy
-    if (Platform.OS !== 'web') {
-      config.redirectUri = 'https://auth.expo.io/@coder_lasitha/eco-lens';
-    }
+    console.log('OAuth Config:', {
+      platform: Platform.OS,
+      clientId: config.clientId.substring(0, 20) + '...',
+      redirectUri: config.redirectUri,
+      useProxy: config.useProxy
+    });
     
     return config;
   };
@@ -127,8 +128,9 @@ const LoginScreen = ({ navigation }) => {
     
     // Log the redirect URI that Expo AuthSession will use
     if (request) {
-      console.log('Expo AuthSession redirect URI:', request.redirectUri);
-      console.log('Expo AuthSession discovery document:', request.discoveryDocument);
+      console.log('✅ Expo AuthSession redirect URI:', request.redirectUri);
+      console.log('📋 ADD THIS TO GOOGLE CLOUD CONSOLE:', request.redirectUri);
+      console.log('================================');
     }
   }, [request, authConfig]);
 
@@ -432,33 +434,16 @@ const LoginScreen = ({ navigation }) => {
     
     // Additional debugging for OAuth flow
     console.log('🔍 DEBUG INFO FOR OAUTH FLOW:');
-    console.log('🔍 Expo Username:', 'coder_lasitha');
-    console.log('🔍 App Slug:', 'eco-lens');
-    console.log('🔍 Full Redirect URI:', `https://auth.expo.io/@coder_lasitha/eco-lens`);
-    console.log('🔍 Web Client ID:', authConfig.webClientId?.substring(0, 30) + '...');
-    console.log('🔍 Android Client ID:', authConfig.androidClientId?.substring(0, 30) + '...');
+    console.log('🔍 Platform:', Platform.OS);
+    console.log('🔍 Client ID:', authConfig.clientId?.substring(0, 30) + '...');
+    console.log('🔍 Redirect URI:', authConfig.redirectUri);
+    console.log('🔍 Use Proxy:', authConfig.useProxy);
     
-    // Platform-specific checks
-    if (Platform.OS === 'android' && !authConfig.androidClientId) {
+    // Validate that we have a client ID
+    if (!authConfig.clientId) {
       Alert.alert(
         'Configuration Error', 
-        'Google OAuth Android Client ID is not configured. Please check EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID in your .env file.'
-      );
-      return;
-    }
-    
-    if (Platform.OS === 'ios' && !authConfig.iosClientId) {
-      Alert.alert(
-        'Configuration Error', 
-        'Google OAuth iOS Client ID is not configured. Please set up iOS OAuth in Google Cloud Console and add EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS to your .env file.'
-      );
-      return;
-    }
-    
-    if (!authConfig.clientId && !authConfig.webClientId) {
-      Alert.alert(
-        'Configuration Error', 
-        'Google OAuth is not properly configured. Please check environment variables.'
+        'Google OAuth is not properly configured. Please check that EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB is set.'
       );
       return;
     }

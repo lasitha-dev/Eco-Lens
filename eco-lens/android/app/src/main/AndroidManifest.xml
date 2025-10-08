@@ -24,12 +24,19 @@
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
-      <!-- Add this intent filter for Expo AuthSession redirect -->
+      <!-- Expo AuthSession redirect handler -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="https" android:host="auth.expo.io" android:pathPrefix="/@coder_lasitha"/>
+        <data android:scheme="https" android:host="auth.expo.io" android:pathPrefix="/@coder_lasitha/eco-lens"/>
+      </intent-filter>
+      <!-- App custom scheme -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="eco-lens"/>
       </intent-filter>
     </activity>
   </application>

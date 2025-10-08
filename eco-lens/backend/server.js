@@ -17,6 +17,8 @@ const app = express();
 const PORT = process.env.PORT || 5002;
 // Fix the Google OAuth client initialization to properly handle all client IDs
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || '782129521115-ciietm4n47j6odv749cmfl9vgbtkmcbg.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
 const client = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 // Middleware
@@ -359,18 +361,33 @@ app.post('/api/auth/google/token', async (req, res) => {
     if (idToken.includes('.') && idToken.length > 100) {
       // This looks like a real JWT token, verify it
       console.log('Verifying ID token with Google client library');
-      try {
-        const ticket = await client.verifyIdToken({
-            idToken,
-            audience: GOOGLE_WEB_CLIENT_ID, 
-        });
-        payload = ticket.getPayload();
-        console.log('Token verified successfully with Google');
-      } catch (verifyError) {
-        console.error('Google token verification failed:', verifyError);
+      
+      // Try verifying with all possible client IDs (web, android, ios)
+      const clientIds = [GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_IOS_CLIENT_ID];
+      let verificationSuccessful = false;
+      
+      for (const clientId of clientIds) {
+        try {
+          console.log(`Attempting verification with client ID: ${clientId.substring(0, 20)}...`);
+          const ticket = await client.verifyIdToken({
+              idToken,
+              audience: clientId, 
+          });
+          payload = ticket.getPayload();
+          console.log(`Token verified successfully with client ID: ${clientId.substring(0, 20)}...`);
+          verificationSuccessful = true;
+          break;
+        } catch (verifyError) {
+          console.log(`Verification failed with client ID ${clientId.substring(0, 20)}...: ${verifyError.message}`);
+          // Continue to next client ID
+        }
+      }
+      
+      if (!verificationSuccessful) {
+        console.error('Google token verification failed with all client IDs');
         return res.status(400).json({ 
           error: 'Invalid Google token', 
-          details: 'The Google token could not be verified: ' + verifyError.message 
+          details: 'The Google token could not be verified with any configured client ID. Please ensure your OAuth configuration is correct.' 
         });
       }
     } else {
