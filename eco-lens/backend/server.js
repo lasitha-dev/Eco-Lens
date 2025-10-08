@@ -9,6 +9,8 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const { OAuth2Client } = require('google-auth-library');
@@ -728,6 +730,12 @@ app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
+
+// Cart Routes
+app.use('/api/cart', cartRoutes);
+
+// Order Routes
+app.use('/api/orders', orderRoutes);
 
 // Survey Routes
 app.use('/api/survey', surveyRoutes);

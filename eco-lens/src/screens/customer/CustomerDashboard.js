@@ -26,6 +26,7 @@ import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import ProductService from '../../api/productService';
 import SurveyService from '../../api/surveyService';
+import CartService from '../../api/cartService';
 import { useAuth } from '../../hooks/useAuthLogin';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
@@ -58,14 +59,34 @@ const CustomerDashboard = ({ navigation }) => {
   }, []);
 
   // Handle add to cart
-  const handleAddToCart = useCallback((product, quantity) => {
-    Alert.alert(
-      'Added to Cart',
-      `${quantity} × ${product.name} added to your cart!`,
-      [{ text: 'OK' }]
-    );
-    setIsModalVisible(false);
-  }, []);
+  const handleAddToCart = useCallback(async (product, quantity) => {
+    try {
+      const response = await CartService.addToCart(product.id || product._id, quantity, auth);
+      
+      if (response.success) {
+        Alert.alert(
+          'Added to Cart',
+          `${quantity} × ${product.name} added to your cart!`,
+          [
+            { text: 'Continue Shopping' },
+            { 
+              text: 'View Cart',
+              onPress: () => {
+                setIsModalVisible(false);
+                navigation.navigate('Cart');
+              }
+            }
+          ]
+        );
+        setIsModalVisible(false);
+      } else {
+        Alert.alert('Error', response.error || 'Failed to add item to cart');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+    }
+  }, [auth, navigation]);
 
   // Load products and personalized recommendations on component mount
   useEffect(() => {

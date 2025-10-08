@@ -94,7 +94,7 @@ const ProfileScreen = ({ navigation }) => {
       subtitle: 'View your past purchases',
       icon: '📦',
       iconColor: '#FF9800',
-      onPress: () => Alert.alert('Coming Soon', 'Order history will be available in a future update.'),
+      onPress: () => navigation.navigate('OrderHistory'),
     },
     {
       id: 'sustainability',
