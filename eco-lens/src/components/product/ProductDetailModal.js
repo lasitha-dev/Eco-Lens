@@ -16,6 +16,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import EcoGradeBadge from './EcoGradeBadge';
+import FavoriteIcon from '../FavoriteIcon';
 import theme from '../../styles/theme';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -88,7 +89,9 @@ const ProductDetailModal = ({
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Product Details</Text>
-          <View style={styles.headerSpace} />
+          <View style={styles.headerActions}>
+            <FavoriteIcon product={product} size={28} />
+          </View>
         </View>
 
         <ScrollView 
@@ -273,8 +276,10 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   
-  headerSpace: {
+  headerActions: {
     width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   scrollContent: {

@@ -11,6 +11,7 @@ const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const favoritesRoutes = require('./routes/favoritesRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const { OAuth2Client } = require('google-auth-library');
@@ -736,6 +737,8 @@ app.use('/api/cart', cartRoutes);
 
 // Order Routes
 app.use('/api/orders', orderRoutes);
+// Favorites Routes
+app.use('/api/favorites', favoritesRoutes);
 
 // Survey Routes
 app.use('/api/survey', surveyRoutes);

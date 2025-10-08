@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
+import { FavoritesProvider } from "./src/hooks/useFavorites";
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Add this line to properly handle redirects
@@ -45,10 +46,12 @@ const Navigation = () => {
   console.log('Linking prefixes:', linking.prefixes);
 
   return (
-    <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
-      <AppNavigator />
-      <StatusBar style="auto" />
-    </NavigationContainer>
+    <FavoritesProvider> 
+      <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
+        <AppNavigator />
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </FavoritesProvider>
   );
 };
 
