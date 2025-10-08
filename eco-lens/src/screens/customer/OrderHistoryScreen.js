@@ -278,19 +278,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.m,
-    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.m,
+    paddingHorizontal: theme.spacing.l,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.xxxl,
     paddingBottom: theme.spacing.m,
+    marginBottom: theme.spacing.s,
     backgroundColor: theme.colors.surface,
+    borderBottomLeftRadius: theme.borderRadius.xl,
+    borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.small,
   },
   
   backButton: {
-    padding: theme.spacing.s,
+    padding: theme.spacing.xs,
   },
   
   title: {
-    fontSize: theme.typography.fontSize.h4,
+    fontSize: 24,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
   },

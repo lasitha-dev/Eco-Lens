@@ -272,7 +272,8 @@ app.post('/api/register', async (req, res) => {
         id: newUser._id,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
-        email: newUser.email
+        email: newUser.email,
+        profilePicture: newUser.profilePicture || null
       }
     });
 
@@ -324,7 +325,8 @@ app.post('/api/login', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.role || 'customer'
+        role: user.role || 'customer',
+        profilePicture: user.profilePicture || null
       }
     });
 
@@ -478,7 +480,8 @@ app.post('/api/auth/google/token', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.role || 'customer'
+        role: user.role || 'customer',
+        profilePicture: user.profilePicture || null
       }
     });
 

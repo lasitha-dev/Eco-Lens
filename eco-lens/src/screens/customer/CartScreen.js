@@ -533,9 +533,9 @@ const styles = StyleSheet.create({
   
   header: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xxxl,
-    paddingBottom: theme.spacing.l,
-    paddingHorizontal: theme.spacing.m,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.xxxl,
+    paddingBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.l,
     marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
@@ -547,43 +547,44 @@ const styles = StyleSheet.create({
   
   headerContent: {
     flex: 1,
-    marginRight: theme.spacing.m, // Add spacing to match CustomerDashboard
+    marginRight: theme.spacing.m,
   },
 
   profileIcon: {
-    padding: theme.spacing.s,
+    padding: theme.spacing.xs,
   },
 
   profileCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primaryLight,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...theme.shadows.small,
   },
 
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 22,
   },
 
   profileText: {
-    fontSize: theme.typography.fontSize.h5,
+    fontSize: 20,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textOnPrimary,
   },
   
   title: {
-    fontSize: theme.typography.fontSize.h2,
+    fontSize: 26,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 2,
   },
   
   subtitle: {
-    fontSize: theme.typography.fontSize.body2,
+    fontSize: 13,
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
   },

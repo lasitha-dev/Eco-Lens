@@ -502,9 +502,9 @@ const styles = StyleSheet.create({
   
   fixedHeader: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xxxl,
-    paddingBottom: theme.spacing.l,
-    paddingHorizontal: theme.spacing.m,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.xxxl,
+    paddingBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.l,
     marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
@@ -521,43 +521,36 @@ const styles = StyleSheet.create({
   },
   
   titleContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.m,
+    flex: 1,
   },
 
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    marginBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.xs,
   },
 
   title: {
-    fontSize: theme.typography.fontSize.h2,
+    fontSize: 26,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 2,
   },
 
   profileIcon: {
-    padding: 5,
+    padding: theme.spacing.xs,
   },
 
   profileCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: theme.colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.small,
   },
 
   profileText: {
@@ -567,11 +560,11 @@ const styles = StyleSheet.create({
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 22,
   },
   
   subtitle: {
-    fontSize: theme.typography.fontSize.body2,
+    fontSize: 13,
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
   },
@@ -581,11 +574,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F0F8FF',
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.s,
+    marginHorizontal: 0,
+    marginBottom: theme.spacing.m,
     paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.round,
+    paddingVertical: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
     borderLeftWidth: 4,
     borderLeftColor: theme.colors.primary,
   },
@@ -593,25 +586,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   personalizedTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     color: theme.colors.primary,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   personalizedSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6C757D',
   },
   toggleButton: {
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
   },
   toggleButtonText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
   
   surveyPromptHeader: {
@@ -619,11 +612,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFF3CD',
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.s,
+    marginHorizontal: 0,
+    marginBottom: theme.spacing.m,
     paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.round,
+    paddingVertical: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
     borderLeftWidth: 4,
     borderLeftColor: '#FFC107',
   },
@@ -631,25 +624,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   surveyPromptTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#856404',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   surveyPromptSubtitle: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#856404',
   },
   completeSurveyButton: {
     backgroundColor: '#FFC107',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
   },
   completeSurveyButtonText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
   
   searchContainer: {
@@ -657,27 +650,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.background,
     marginHorizontal: 0,
-    marginBottom: 0,
+    marginTop: theme.spacing.xs,
     paddingHorizontal: theme.spacing.m,
-    borderRadius: theme.borderRadius.round,
-    height: 48,
+    borderRadius: theme.borderRadius.l,
+    height: 50,
   },
   
   searchIcon: {
-    fontSize: 20,
-    marginRight: theme.spacing.s,
+    fontSize: 22,
+    marginRight: theme.spacing.m,
   },
   
   searchInput: {
     flex: 1,
-    fontSize: theme.typography.fontSize.body1,
+    fontSize: 15,
     color: theme.colors.text,
   },
   
   clearIcon: {
-    fontSize: 20,
+    fontSize: 22,
     color: theme.colors.textSecondary,
-    paddingLeft: theme.spacing.s,
+    paddingLeft: theme.spacing.m,
   },
   
   categoriesContainer: {

@@ -320,10 +320,12 @@ const styles = StyleSheet.create({
   
   header: {
     backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.xxxl,
+    paddingBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.l,
+    marginBottom: theme.spacing.s,
+    borderBottomLeftRadius: theme.borderRadius.xl,
+    borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.small,
   },
   
@@ -331,23 +333,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
   },
   
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing.s,
   },
   
   headerTitle: {
-    fontSize: theme.typography.fontSize.h4,
+    fontSize: 24,
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
+    color: theme.colors.primary,
   },
   
   subtitle: {
-    fontSize: theme.typography.fontSize.body2,
+    fontSize: 13,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.xs,
   },
@@ -355,11 +357,11 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing.xs,
   },
   
   viewToggle: {
     padding: theme.spacing.s,
-    marginRight: theme.spacing.s,
   },
   
   refreshButton: {
