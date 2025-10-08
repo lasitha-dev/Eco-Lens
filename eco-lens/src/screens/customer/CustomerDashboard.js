@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
+import CartToast from '../../components/CartToast';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import ProductService from '../../api/productService';
 import SurveyService from '../../api/surveyService';
@@ -35,7 +36,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const CustomerDashboard = ({ navigation }) => {
   const { user, auth } = useAuth();
-  
+
   // State management
   const [products, setProducts] = useState([]);
   const [personalizedProducts, setPersonalizedProducts] = useState([]);
@@ -51,6 +52,8 @@ const CustomerDashboard = ({ navigation }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [showPersonalized, setShowPersonalized] = useState(true);
+  const [showCartToast, setShowCartToast] = useState(false);
+  const [cartToastMessage, setCartToastMessage] = useState('');
 
   // Handle product press
   const handleProductPress = useCallback((product) => {
@@ -58,32 +61,27 @@ const CustomerDashboard = ({ navigation }) => {
     setIsModalVisible(true);
   }, []);
 
-  // Handle add to cart
+  // Handle add to cart with optimistic update
   const handleAddToCart = useCallback(async (product, quantity) => {
+    // Optimistic UI update - show toast immediately
+    setCartToastMessage(`${quantity} × ${product.name} added to cart!`);
+    setShowCartToast(true);
+    setIsModalVisible(false);
+
     try {
+      // Make API call in background
       const response = await CartService.addToCart(product.id || product._id, quantity, auth);
       
-      if (response.success) {
-        Alert.alert(
-          'Added to Cart',
-          `${quantity} × ${product.name} added to your cart!`,
-          [
-            { text: 'Continue Shopping' },
-            { 
-              text: 'View Cart',
-              onPress: () => {
-                setIsModalVisible(false);
-                navigation.navigate('Cart');
-              }
-            }
-          ]
-        );
-        setIsModalVisible(false);
-      } else {
+      if (!response.success) {
+        // If failed, show error and hide toast
+        setShowCartToast(false);
         Alert.alert('Error', response.error || 'Failed to add item to cart');
       }
+      // Success - toast already showing, no need to do anything
     } catch (error) {
+      // If error, show error and hide toast
       console.error('Error adding to cart:', error);
+      setShowCartToast(false);
       Alert.alert('Error', 'Failed to add item to cart. Please try again.');
     }
   }, [auth, navigation]);
@@ -480,6 +478,17 @@ const CustomerDashboard = ({ navigation }) => {
         product={selectedProduct}
         onClose={() => setIsModalVisible(false)}
         onAddToCart={handleAddToCart}
+      />
+
+      {/* Cart Toast Notification */}
+      <CartToast
+        visible={showCartToast}
+        message={cartToastMessage}
+        onPress={() => {
+          setShowCartToast(false);
+          navigation.navigate('Cart');
+        }}
+        onHide={() => setShowCartToast(false)}
       />
     </SafeAreaView>
   );

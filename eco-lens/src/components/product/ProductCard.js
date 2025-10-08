@@ -46,13 +46,6 @@ const ProductCard = memo(({
       onPress={() => onPress(product)}
       activeOpacity={0.7}
     >
-      {/* Eco-friendly indicator */}
-      {isEcoFriendly && (
-        <View style={styles.ecoIndicator}>
-          <Text style={styles.ecoIndicatorText}>ECO</Text>
-        </View>
-      )}
-      
       {/* Product Image */}
       <View style={styles.imageContainer}>
         <Image 
@@ -68,6 +61,12 @@ const ProductCard = memo(({
         <View style={styles.badgePosition}>
           <EcoGradeBadge grade={sustainabilityGrade} size="small" />
         </View>
+        {/* Eco-friendly indicator positioned on image */}
+        {isEcoFriendly && (
+          <View style={styles.ecoIndicator}>
+            <Text style={styles.ecoIndicatorText}>ECO</Text>
+          </View>
+        )}
       </View>
       
       {/* Product Info */}
@@ -172,7 +171,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: theme.borderRadius.m,
     overflow: 'hidden',
   },
-  
   gridImage: {
     width: '100%',
     height: '100%',

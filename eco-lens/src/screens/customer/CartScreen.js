@@ -102,7 +102,7 @@ const CartScreen = ({ navigation }) => {
     fetchCart();
   }, []);
 
-  // Function to update item quantity
+  // Function to update item quantity with optimistic updates
   const updateQuantity = async (itemId, newQuantity) => {
     if (newQuantity <= 0) {
       removeItem(itemId);
@@ -110,6 +110,16 @@ const CartScreen = ({ navigation }) => {
     }
 
     console.log('Updating quantity:', { itemId, newQuantity });
+
+    // Store previous state for rollback
+    const previousCartItems = [...cartItems];
+
+    // Optimistic update - update UI immediately
+    setCartItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
+    );
 
     try {
       const response = await fetch(`${API_BASE_URL}/cart/update`, {
@@ -127,22 +137,31 @@ const CartScreen = ({ navigation }) => {
       const data = await response.json();
       console.log('Update response:', data);
 
-      if (data.success) {
-        fetchCart(); // Refresh cart
-      } else {
+      if (!data.success) {
+        // Rollback on failure
         console.error('Update failed:', data);
+        setCartItems(previousCartItems);
         Alert.alert('Error', data.error || 'Failed to update quantity');
       }
+      // Success - no need to refetch, UI already updated
     } catch (error) {
+      // Rollback on error
       console.error('Error updating quantity:', error);
+      setCartItems(previousCartItems);
       Alert.alert('Error', 'Failed to update cart. Please try again.');
     }
   };
 
-  // Function to remove item from cart
+  // Function to remove item from cart with optimistic updates
   const removeItem = async (itemId) => {
     console.log('Removing item:', itemId);
     
+    // Store previous state for rollback
+    const previousCartItems = [...cartItems];
+
+    // Optimistic update - remove item immediately from UI
+    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+
     try {
       const response = await fetch(`${API_BASE_URL}/cart/remove/${itemId}`, {
         method: 'DELETE',
@@ -155,14 +174,17 @@ const CartScreen = ({ navigation }) => {
       const data = await response.json();
       console.log('Remove response:', data);
 
-      if (data.success) {
-        fetchCart(); // Refresh cart
-      } else {
+      if (!data.success) {
+        // Rollback on failure
         console.error('Remove failed:', data);
+        setCartItems(previousCartItems);
         Alert.alert('Error', data.error || 'Failed to remove item');
       }
+      // Success - no need to refetch, UI already updated
     } catch (error) {
+      // Rollback on error
       console.error('Error removing item:', error);
+      setCartItems(previousCartItems);
       Alert.alert('Error', 'Failed to remove item. Please try again.');
     }
   };

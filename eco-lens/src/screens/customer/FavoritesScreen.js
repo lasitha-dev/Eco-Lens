@@ -16,12 +16,15 @@ import {
   Alert,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useAuth } from '../../hooks/useAuthLogin';
+import CartService from '../../api/cartService';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
+import CartToast from '../../components/CartToast';
 import theme from '../../styles/theme';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -41,6 +44,8 @@ const FavoritesScreen = ({ navigation }) => {
   const [showModal, setShowModal] = useState(false);
   const [isListView, setIsListView] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCartToast, setShowCartToast] = useState(false);
+  const [cartToastMessage, setCartToastMessage] = useState('');
   
   // Animation for empty state
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -71,12 +76,30 @@ const FavoritesScreen = ({ navigation }) => {
     setSelectedProduct(null);
   };
 
-  // Handle add to cart (if needed)
-  const handleAddToCart = (product, quantity) => {
-    // Implement cart functionality if needed
-    Alert.alert('Info', 'Cart functionality not implemented yet');
+  // Handle add to cart with optimistic update
+  const handleAddToCart = useCallback(async (product, quantity) => {
+    // Optimistic UI update - show toast immediately
+    setCartToastMessage(`${quantity} × ${product.name} added to cart!`);
+    setShowCartToast(true);
     handleModalClose();
-  };
+
+    try {
+      // Make API call in background
+      const response = await CartService.addToCart(product.id || product._id, quantity, auth);
+      
+      if (!response.success) {
+        // If failed, show error and hide toast
+        setShowCartToast(false);
+        Alert.alert('Error', response.error || 'Failed to add item to cart');
+      }
+      // Success - toast already showing, no need to do anything
+    } catch (error) {
+      // If error, show error and hide toast
+      console.error('Error adding to cart:', error);
+      setShowCartToast(false);
+      Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+    }
+  }, [auth, navigation]);
 
   // Clear error effect
   useEffect(() => {
@@ -274,6 +297,17 @@ const FavoritesScreen = ({ navigation }) => {
         onClose={handleModalClose}
         onAddToCart={handleAddToCart}
       />
+
+      {/* Cart Toast Notification */}
+      <CartToast
+        visible={showCartToast}
+        message={cartToastMessage}
+        onPress={() => {
+          setShowCartToast(false);
+          navigation.navigate('Cart');
+        }}
+        onHide={() => setShowCartToast(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -362,6 +396,7 @@ const styles = StyleSheet.create({
   
   listContainer: {
     padding: theme.spacing.m,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Extra padding for tab bar
   },
   
   emptyListContainer: {
