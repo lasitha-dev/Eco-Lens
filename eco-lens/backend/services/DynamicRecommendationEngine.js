@@ -20,6 +20,10 @@ class DynamicRecommendationEngine {
     
     this.timeDecayFactor = 0.1; // How much older interactions decay
     this.maxHistoryDays = 90; // Maximum days to consider for recommendations
+    
+    // Track recently shown products per user to prevent immediate repetition
+    this.recentlyShown = new Map(); // userId -> Set of productIds
+    this.maxRecentlyShown = 20; // Keep track of last 20 shown products per user
   }
 
   /**
@@ -415,8 +419,8 @@ class DynamicRecommendationEngine {
         }
       }
 
-      // Get products matching dynamic criteria
-      let products = await Product.find(query).limit(limit * 2);
+      // Get products matching dynamic criteria with randomization
+      let products = await Product.find(query).limit(limit * 3); // Get more products for better shuffling
       
       console.log(`🔍 Found ${products.length} products matching user preferences for user ${userId}`);
 
@@ -429,9 +433,13 @@ class DynamicRecommendationEngine {
           category: { $in: popularCategories }
         })
           .sort({ sustainabilityScore: -1, rating: -1 })
-          .limit(limit * 2);
+          .limit(limit * 3);
       }
 
+      // Shuffle products to add variety and prevent repetition with time-based seed
+      const timeSeed = Math.floor(Date.now() / (1000 * 60 * 1)); // Changes every 1 minute
+      products = this.shuffleArray(products, timeSeed);
+      
       // Calculate dynamic recommendation scores
       const scoredProducts = products.map(product => ({
         ...product.toObject(),
@@ -442,11 +450,19 @@ class DynamicRecommendationEngine {
         })
       }));
 
-      // Sort by recommendation score
-      scoredProducts.sort((a, b) => b.recommendationScore - a.recommendationScore);
+      // Sort by recommendation score but add some randomization
+      scoredProducts.sort((a, b) => {
+        const scoreDiff = b.recommendationScore - a.recommendationScore;
+        // Add small random factor to break ties and add variety
+        const randomFactor = (Math.random() - 0.5) * 0.1;
+        return scoreDiff + randomFactor;
+      });
 
-      // Return top recommendations
-      return scoredProducts.slice(0, limit);
+      // Apply intelligent selection to ensure variety
+      const finalRecommendations = this.selectVariedRecommendations(scoredProducts, limit, userId);
+      
+      console.log(`🎯 Selected ${finalRecommendations.length} varied recommendations for user ${userId}`);
+      return finalRecommendations;
 
     } catch (error) {
       console.error('Error generating dynamic recommendations:', error);
@@ -608,6 +624,109 @@ class DynamicRecommendationEngine {
     } catch (error) {
       console.error('Error getting real-time recommendations:', error);
       return [];
+    }
+  }
+
+  /**
+   * Generate a seeded random number for consistent but varied results
+   */
+  seededRandom(seed) {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  }
+
+  /**
+   * Shuffle array using Fisher-Yates algorithm with optional seed
+   */
+  shuffleArray(array, seed = null) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const randomValue = seed ? this.seededRandom(seed + i) : Math.random();
+      const j = Math.floor(randomValue * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /**
+   * Select varied recommendations to prevent repetition
+   */
+  selectVariedRecommendations(scoredProducts, limit, userId = null) {
+    if (scoredProducts.length <= limit) {
+      return scoredProducts;
+    }
+
+    const selected = [];
+    const usedProducts = new Set();
+    const categoryCount = {};
+    
+    // Get recently shown products for this user
+    const recentlyShown = userId ? (this.recentlyShown.get(userId) || new Set()) : new Set();
+    
+    // First pass: select top products ensuring category variety and avoiding recently shown
+    for (const product of scoredProducts) {
+      if (selected.length >= limit) break;
+      
+      const productId = product._id.toString();
+      const category = product.category;
+      const currentCategoryCount = categoryCount[category] || 0;
+      
+      // Skip if recently shown (unless we have very few options)
+      if (recentlyShown.has(productId) && scoredProducts.length > limit * 2) {
+        continue;
+      }
+      
+      // Allow max 3 products per category to ensure variety
+      if (currentCategoryCount < 3) {
+        selected.push(product);
+        usedProducts.add(productId);
+        categoryCount[category] = currentCategoryCount + 1;
+      }
+    }
+    
+    // Second pass: fill remaining slots with best remaining products
+    if (selected.length < limit) {
+      for (const product of scoredProducts) {
+        if (selected.length >= limit) break;
+        
+        const productId = product._id.toString();
+        if (!usedProducts.has(productId)) {
+          selected.push(product);
+          usedProducts.add(productId);
+        }
+      }
+    }
+    
+    // Update recently shown products for this user
+    if (userId) {
+      this.updateRecentlyShown(userId, selected);
+    }
+    
+    // Final shuffle to randomize order with time-based seed
+    const timeSeed = Math.floor(Date.now() / (1000 * 30)); // Changes every 30 seconds
+    return this.shuffleArray(selected, timeSeed);
+  }
+
+  /**
+   * Update recently shown products for a user
+   */
+  updateRecentlyShown(userId, selectedProducts) {
+    if (!this.recentlyShown.has(userId)) {
+      this.recentlyShown.set(userId, new Set());
+    }
+    
+    const userRecentlyShown = this.recentlyShown.get(userId);
+    
+    // Add new products to recently shown
+    selectedProducts.forEach(product => {
+      userRecentlyShown.add(product._id.toString());
+    });
+    
+    // Keep only the most recent products (remove oldest if over limit)
+    if (userRecentlyShown.size > this.maxRecentlyShown) {
+      const productsArray = Array.from(userRecentlyShown);
+      const toRemove = productsArray.slice(0, userRecentlyShown.size - this.maxRecentlyShown);
+      toRemove.forEach(productId => userRecentlyShown.delete(productId));
     }
   }
 
