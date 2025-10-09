@@ -26,7 +26,11 @@ import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
 import ProductService from '../../api/productService';
 import SurveyService from '../../api/surveyService';
+import SearchAnalyticsService from '../../api/searchAnalyticsService';
+import EnhancedRecommendationService from '../../api/enhancedRecommendationService';
 import { useAuth } from '../../hooks/useAuthLogin';
+import { testAuthToken } from '../../utils/authTest';
+import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 
@@ -50,12 +54,30 @@ const CustomerDashboard = ({ navigation }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [showPersonalized, setShowPersonalized] = useState(true);
+  
+  // Search tracking state
+  const [currentSearchId, setCurrentSearchId] = useState(null);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchInsights, setSearchInsights] = useState(null);
+  const [recommendationInsights, setRecommendationInsights] = useState(null);
+  const [showAuthDebugger, setShowAuthDebugger] = useState(false);
 
-  // Handle product press
-  const handleProductPress = useCallback((product) => {
+  // Handle product press with search tracking
+  const handleProductPress = useCallback(async (product) => {
     setSelectedProduct(product);
     setIsModalVisible(true);
-  }, []);
+    
+    // Track product click if we have a current search
+    if (currentSearchId) {
+      try {
+        await SearchAnalyticsService.trackProductClick(currentSearchId, product.id, 0);
+        console.log('✅ Product click tracked for search:', currentSearchId);
+      } catch (error) {
+        console.error('Error tracking product click:', error);
+      }
+    }
+  }, [currentSearchId]);
 
   // Handle add to cart
   const handleAddToCart = useCallback((product, quantity) => {
@@ -71,6 +93,11 @@ const CustomerDashboard = ({ navigation }) => {
   useEffect(() => {
     loadProducts();
     loadPersonalizedRecommendations();
+    
+    // Test authentication for debugging
+    testAuthToken().then(result => {
+      console.log('🔍 Auth test result:', result);
+    });
   }, []);
 
   // Debug: Track showPersonalized changes
@@ -80,25 +107,68 @@ const CustomerDashboard = ({ navigation }) => {
     console.log('Current personalized products count:', personalizedProducts.length);
   }, [showPersonalized, products.length, personalizedProducts.length]);
 
-  // Load personalized recommendations
+  // Load personalized recommendations with search history integration
   const loadPersonalizedRecommendations = async () => {
-    if (!user || !auth) return;
+    if (!user || !auth) {
+      console.log('No user or auth token available for personalized recommendations');
+      return;
+    }
     
     try {
       // First check if survey is completed
       const statusResponse = await SurveyService.checkSurveyStatus(user.id, auth);
       setSurveyCompleted(statusResponse.completed);
       
-      if (statusResponse.completed) {
-        const response = await SurveyService.getRecommendations(user.id, auth);
-        if (response.recommendations && response.recommendations.length > 0) {
-          setPersonalizedProducts(response.recommendations);
-          setUserPreferences(response.preferences);
-          console.log(`✅ Loaded ${response.recommendations.length} personalized recommendations`);
+      // Get enhanced recommendations combining survey and search data
+      const response = await EnhancedRecommendationService.getEnhancedRecommendations(
+        user.id, 
+        auth, 
+        { 
+          limit: 20, 
+          days: 30, 
+          includeSearchHistory: true, 
+          includeSurveyData: statusResponse.completed,
+          prioritizeRecent: true 
+        }
+      );
+      
+      if (response.recommendations && response.recommendations.length > 0) {
+        setPersonalizedProducts(response.recommendations);
+        setUserPreferences(response.surveyPreferences);
+        setRecommendationInsights(response.insights);
+        console.log(`✅ Loaded ${response.recommendations.length} enhanced recommendations from ${response.source}`);
+        console.log(`📊 Confidence score: ${response.confidenceScore}%`);
+      }
+      
+      // Load search insights for user profile
+      try {
+        const searchInsights = await EnhancedRecommendationService.getSearchBehaviorInsights(user.id, auth, 30);
+        setSearchInsights(searchInsights);
+        console.log('✅ Loaded search behavior insights');
+      } catch (insightError) {
+        console.error('Error loading search insights:', insightError);
+        // Don't fail the entire function if search insights fail
+        if (insightError.message.includes('Access token required')) {
+          console.log('Authentication required for search insights, skipping...');
         }
       }
+      
     } catch (error) {
       console.error('Error loading personalized recommendations:', error);
+      // If there's an auth error, try to load basic recommendations
+      if (error.message.includes('Access token required')) {
+        console.log('Authentication required, falling back to basic recommendations');
+        try {
+          const basicResponse = await SurveyService.getRecommendations(user.id, auth);
+          if (basicResponse.recommendations && basicResponse.recommendations.length > 0) {
+            setPersonalizedProducts(basicResponse.recommendations);
+            setUserPreferences(basicResponse.preferences);
+            console.log('✅ Loaded basic recommendations from survey data');
+          }
+        } catch (fallbackError) {
+          console.error('Error loading basic recommendations:', fallbackError);
+        }
+      }
     }
   };
 
@@ -163,6 +233,59 @@ const CustomerDashboard = ({ navigation }) => {
     };
     return orderMap[sortOption] || 'desc';
   };
+
+  // Handle search with tracking
+  const handleSearch = useCallback(async (query) => {
+    setSearchQuery(query);
+    setShowSuggestions(false);
+    
+    if (query.length >= 2) {
+      try {
+        // Track the search
+        const searchData = await SearchAnalyticsService.searchWithTracking(query, {
+          category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          sustainabilityGrade: selectedFilter === 'eco-friendly' ? 'A' : undefined
+        });
+        
+        setCurrentSearchId(searchData.searchId);
+        console.log('✅ Search tracked:', query);
+      } catch (error) {
+        console.error('Error tracking search:', error);
+        // Don't fail the search if tracking fails
+        if (error.message.includes('Access token required')) {
+          console.log('Authentication required for search tracking, continuing without tracking...');
+        }
+        setCurrentSearchId(null);
+      }
+    } else {
+      setCurrentSearchId(null);
+    }
+  }, [selectedCategory, selectedFilter]);
+
+  // Handle search input changes with suggestions
+  const handleSearchInputChange = useCallback(async (text) => {
+    setSearchQuery(text);
+    
+    if (text.length >= 2) {
+      try {
+        const suggestions = await SearchAnalyticsService.getSearchSuggestions(text, 5);
+        setSearchSuggestions(suggestions.suggestions || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error('Error getting search suggestions:', error);
+        // Don't show suggestions if there's an auth error
+        if (error.message.includes('Access token required')) {
+          console.log('Authentication required for search suggestions');
+          setSearchSuggestions([]);
+        } else {
+          setSearchSuggestions([]);
+        }
+      }
+    } else {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, []);
 
   // Reload products when filters change
   useEffect(() => {
@@ -343,26 +466,34 @@ const CustomerDashboard = ({ navigation }) => {
             <Text style={styles.title}>🌱 Eco-Lens</Text>
             <Text style={styles.subtitle}>Shop Sustainably, Live Responsibly</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.profileIcon}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <View style={styles.profileCircle}>
-              {user?.profilePicture ? (
-                <Image
-                  source={{ uri: user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100 
-                    ? `data:image/jpeg;base64,${user.profilePicture}` 
-                    : user.profilePicture }}
-                  style={styles.profileImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text style={styles.profileText}>
-                  {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.debugButton}
+              onPress={() => setShowAuthDebugger(true)}
+            >
+              <Text style={styles.debugButtonText}>🔍</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.profileIcon}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <View style={styles.profileCircle}>
+                {user?.profilePicture ? (
+                  <Image
+                    source={{ uri: user.profilePicture.startsWith('/9j/') || user.profilePicture.length > 100 
+                      ? `data:image/jpeg;base64,${user.profilePicture}` 
+                      : user.profilePicture }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.profileText}>
+                    {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Personalized Recommendations Header */}
@@ -371,8 +502,21 @@ const CustomerDashboard = ({ navigation }) => {
             <View style={styles.personalizedTitleContainer}>
               <Text style={styles.personalizedTitle}>🌟 Recommended for You</Text>
               <Text style={styles.personalizedSubtitle}>
-                Based on your preferences
+                {recommendationInsights ? 
+                  `Based on your ${recommendationInsights.totalRecommendations} searches and preferences` :
+                  'Based on your preferences'
+                }
               </Text>
+              {recommendationInsights && (
+                <View style={styles.insightsRow}>
+                  <Text style={styles.insightText}>
+                    📊 {Math.round(recommendationInsights.ecoFriendlyPercentage)}% eco-friendly
+                  </Text>
+                  <Text style={styles.insightText}>
+                    ⭐ {Math.round(recommendationInsights.averageScore)}% avg score
+                  </Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity
               style={styles.toggleButton}
@@ -405,7 +549,7 @@ const CustomerDashboard = ({ navigation }) => {
           </View>
         )}
 
-        {/* Search Bar */}
+        {/* Search Bar with Suggestions */}
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -414,16 +558,46 @@ const CustomerDashboard = ({ navigation }) => {
             placeholder="Search eco-friendly products..."
             placeholderTextColor={theme.colors.textSecondary}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearchInputChange}
+            onEndEditing={() => handleSearch(searchQuery)}
             autoCorrect={false}
             autoCapitalize="none"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => {
+              setSearchQuery('');
+              setShowSuggestions(false);
+              setCurrentSearchId(null);
+            }}>
               <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
+        
+        {/* Search Suggestions */}
+        {showSuggestions && searchSuggestions.length > 0 && (
+          <View style={styles.suggestionsContainer}>
+            {searchSuggestions.map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.suggestionItem}
+                onPress={() => {
+                  setSearchQuery(suggestion.query);
+                  setShowSuggestions(false);
+                  handleSearch(suggestion.query);
+                }}
+              >
+                <Text style={styles.suggestionIcon}>
+                  {suggestion.type === 'user_history' ? '🕒' : '🔥'}
+                </Text>
+                <Text style={styles.suggestionText}>{suggestion.query}</Text>
+                {suggestion.category && (
+                  <Text style={styles.suggestionCategory}>{suggestion.category}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
       
       <FlatList
@@ -459,6 +633,12 @@ const CustomerDashboard = ({ navigation }) => {
         product={selectedProduct}
         onClose={() => setIsModalVisible(false)}
         onAddToCart={handleAddToCart}
+      />
+      
+      {/* Auth Debugger */}
+      <SimpleAuthDebugger
+        visible={showAuthDebugger}
+        onClose={() => setShowAuthDebugger(false)}
       />
     </SafeAreaView>
   );
@@ -500,6 +680,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+  },
+  
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  
+  debugButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  debugButtonText: {
+    fontSize: 16,
   },
 
   title: {
@@ -792,6 +991,64 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     fontSize: theme.typography.fontSize.body1,
     color: theme.colors.textSecondary,
+  },
+  
+  // Search suggestions styles
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 48,
+    left: theme.spacing.m,
+    right: theme.spacing.m,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.m,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    zIndex: 1000,
+    ...theme.shadows.medium,
+  },
+  
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  
+  suggestionIcon: {
+    fontSize: 16,
+    marginRight: theme.spacing.s,
+  },
+  
+  suggestionText: {
+    flex: 1,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.text,
+  },
+  
+  suggestionCategory: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.s,
+  },
+  
+  // Insights styles
+  insightsRow: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.xs,
+    gap: theme.spacing.s,
+  },
+  
+  insightText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.s,
   },
 });
 

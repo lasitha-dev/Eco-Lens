@@ -218,6 +218,11 @@ class ProductService {
     }
   }
 
+  // Alias for bulkCreateProducts (for component compatibility)
+  static async createBulkProducts(products) {
+    return this.bulkCreateProducts(products);
+  }
+
   // Get product statistics for admin dashboard (admin only)
   static async getProductStats() {
     try {
