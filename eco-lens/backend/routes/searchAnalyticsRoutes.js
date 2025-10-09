@@ -163,8 +163,12 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
     const patterns = await SearchHistory.getUserSearchPatterns(userId, parseInt(days));
 
     if (patterns.totalSearches === 0) {
-      // No search history, return general recommendations
-      const generalProducts = await Product.find({ isActive: true })
+      // No search history, return diverse general recommendations with multiple categories
+      const popularCategories = ['Electronics', 'Fashion', 'Home & Garden', 'Personal Care', 'Sports & Outdoors'];
+      const generalProducts = await Product.find({ 
+        isActive: true,
+        category: { $in: popularCategories }
+      })
         .sort({ sustainabilityScore: -1, rating: -1 })
         .limit(parseInt(limit));
 
@@ -172,7 +176,14 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
         success: true,
         recommendations: generalProducts,
         source: 'general',
-        message: 'No search history found, showing general recommendations'
+        message: 'No search history found, showing diverse general recommendations',
+        patterns: {
+          totalSearches: 0,
+          topCategories: popularCategories.slice(0, 3).map(cat => [cat, 0]),
+          topMaterials: [],
+          topBrands: [],
+          recentSearches: []
+        }
       });
     }
 
@@ -183,8 +194,21 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
     // Category preferences (most searched categories get higher weight)
     const categoryEntries = Object.entries(patterns.categoryFrequency);
     if (categoryEntries.length > 0) {
-      const topCategory = categoryEntries.sort(([,a], [,b]) => b - a)[0][0];
-      query.category = topCategory;
+      // Sort categories by frequency and get top categories
+      const sortedCategories = categoryEntries.sort(([,a], [,b]) => b - a);
+      
+      // Always show minimum 3 categories for professional dashboard
+      const topCategories = sortedCategories.slice(0, 3).map(([category]) => category);
+      
+      // If user has searched fewer than 3 categories, fill with popular categories
+      if (topCategories.length < 3) {
+        const popularCategories = ['Electronics', 'Fashion', 'Home & Garden', 'Personal Care', 'Sports & Outdoors'];
+        const additionalCategories = popularCategories.filter(cat => !topCategories.includes(cat));
+        topCategories.push(...additionalCategories.slice(0, 3 - topCategories.length));
+      }
+      
+      console.log(`🎯 Using ${topCategories.length} categories for personalized recommendations:`, topCategories);
+      query.category = { $in: topCategories };
     }
 
     // Sustainability grade preferences

@@ -266,8 +266,9 @@ class DynamicRecommendationEngine {
    * Update dashboard categories based on user behavior
    */
   async updateDashboardCategories(userPrefs) {
+    // Initialize categoryFrequency if it doesn't exist
     if (!userPrefs.preferences.categoryFrequency) {
-      return;
+      userPrefs.preferences.categoryFrequency = {};
     }
 
     // Valid dashboard categories from schema
@@ -282,15 +283,31 @@ class DynamicRecommendationEngine {
       'Toys & Games'
     ];
 
-    // Get top 3 categories by frequency, but only include valid ones
-    const topCategories = Object.entries(userPrefs.preferences.categoryFrequency)
+    // Get top categories by frequency, but only include valid ones
+    const sortedCategories = Object.entries(userPrefs.preferences.categoryFrequency)
       .filter(([category]) => validCategories.includes(category))
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 3)
-      .map(([category]) => category);
+      .sort(([,a], [,b]) => b - a);
 
-    // Update dashboard categories only with valid enum values
-    userPrefs.preferences.dashboardCategories = topCategories;
+    // Always maintain minimum 3 categories for professional dashboard
+    let topCategories = sortedCategories.slice(0, 3).map(([category]) => category);
+    
+    // If user has interacted with fewer than 3 categories, preserve existing dashboard categories
+    if (topCategories.length < 3 && userPrefs.preferences.dashboardCategories) {
+      const existingCategories = userPrefs.preferences.dashboardCategories.filter(cat => 
+        validCategories.includes(cat) && !topCategories.includes(cat)
+      );
+      topCategories.push(...existingCategories.slice(0, 3 - topCategories.length));
+    }
+    
+    // If still fewer than 3, fill with popular categories
+    if (topCategories.length < 3) {
+      const popularCategories = ['Electronics', 'Fashion', 'Home & Garden', 'Personal Care', 'Sports & Outdoors'];
+      const additionalCategories = popularCategories.filter(cat => !topCategories.includes(cat));
+      topCategories.push(...additionalCategories.slice(0, 3 - topCategories.length));
+    }
+
+    // Update dashboard categories with minimum 3 categories
+    userPrefs.preferences.dashboardCategories = topCategories.slice(0, 3);
 
     console.log(`📊 Updated dashboard categories for user: ${topCategories.join(', ')}`);
   }
@@ -359,16 +376,30 @@ class DynamicRecommendationEngine {
         const allCategoryWeights = { ...categoryWeights, ...categoryFrequency };
         
         if (Object.keys(allCategoryWeights).length > 0) {
-          const topCategories = Object.entries(allCategoryWeights)
-            .sort(([,a], [,b]) => b - a)
-            .slice(0, 3)
-            .map(([category]) => category);
+          // Sort categories by frequency and get top categories
+          const sortedCategories = Object.entries(allCategoryWeights)
+            .sort(([,a], [,b]) => b - a);
+          
+          // Always show minimum 3 categories for professional dashboard
+          let topCategories = sortedCategories.slice(0, 3).map(([category]) => category);
+          
+          // If user has interacted with fewer than 3 categories, fill with popular categories
+          if (topCategories.length < 3) {
+            const popularCategories = ['Electronics', 'Clothing', 'Home & Garden', 'Beauty & Personal Care', 'Sports & Outdoors'];
+            const additionalCategories = popularCategories.filter(cat => !topCategories.includes(cat));
+            topCategories.push(...additionalCategories.slice(0, 3 - topCategories.length));
+          }
 
           console.log(`🏆 Top categories for user ${userId}:`, topCategories);
 
           if (topCategories.length > 0) {
             query.category = { $in: topCategories };
           }
+        } else {
+          // No category weights, use diverse popular categories
+          const popularCategories = ['Electronics', 'Clothing', 'Home & Garden', 'Beauty & Personal Care', 'Sports & Outdoors'];
+          query.category = { $in: popularCategories.slice(0, 3) };
+          console.log(`🎯 No category weights found, using diverse categories for user ${userId}:`, popularCategories.slice(0, 3));
         }
 
         // Apply sustainability preferences based on interaction history
@@ -389,10 +420,14 @@ class DynamicRecommendationEngine {
       
       console.log(`🔍 Found ${products.length} products matching user preferences for user ${userId}`);
 
-      // If no products match, get general recommendations
+      // If no products match, get diverse general recommendations
       if (products.length === 0) {
-        console.log(`⚠️ No products match user preferences, using general recommendations for user ${userId}`);
-        products = await Product.find({ isActive: true })
+        console.log(`⚠️ No products match user preferences, using diverse general recommendations for user ${userId}`);
+        const popularCategories = ['Electronics', 'Clothing', 'Home & Garden', 'Beauty & Personal Care', 'Sports & Outdoors'];
+        products = await Product.find({ 
+          isActive: true,
+          category: { $in: popularCategories }
+        })
           .sort({ sustainabilityScore: -1, rating: -1 })
           .limit(limit * 2);
       }
