@@ -21,6 +21,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
 import { MOCK_PRODUCTS, CATEGORIES, FILTER_PRESETS, SORT_OPTIONS } from '../../constants/mockData';
@@ -28,6 +29,7 @@ import ProductService from '../../api/productService';
 import SurveyService from '../../api/surveyService';
 import SearchAnalyticsService from '../../api/searchAnalyticsService';
 import EnhancedRecommendationService from '../../api/enhancedRecommendationService';
+import DynamicRecommendationService from '../../api/dynamicRecommendationService';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
 import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
@@ -63,12 +65,25 @@ const CustomerDashboard = ({ navigation }) => {
   const [recommendationInsights, setRecommendationInsights] = useState(null);
   const [showAuthDebugger, setShowAuthDebugger] = useState(false);
 
-  // Handle product press with search tracking
+  // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
     setSelectedProduct(product);
     setIsModalVisible(true);
     
-    // Track product click if we have a current search
+    // Track product view with dynamic recommendations
+    try {
+      await DynamicRecommendationService.trackProductView(product.id, 0, 'search');
+      console.log('✅ Product view tracked with dynamic updates');
+      console.log(`🎯 Tracked product: ${product.name} (${product.category}) - Grade: ${product.sustainabilityGrade}`);
+      
+      // Refresh personalized recommendations after tracking
+      await refreshPersonalizedRecommendations();
+    } catch (error) {
+      console.error('Error tracking product view with dynamic system:', error);
+      // Don't fail the product view, just log the error
+    }
+    
+    // Also track with legacy system for backward compatibility
     if (currentSearchId) {
       try {
         await SearchAnalyticsService.trackProductClick(currentSearchId, product.id, 0);
@@ -79,8 +94,21 @@ const CustomerDashboard = ({ navigation }) => {
     }
   }, [currentSearchId]);
 
-  // Handle add to cart
-  const handleAddToCart = useCallback((product, quantity) => {
+  // Handle add to cart with dynamic tracking
+  const handleAddToCart = useCallback(async (product, quantity) => {
+    // Track add to cart with dynamic recommendations
+    try {
+      await DynamicRecommendationService.trackAddToCart(product.id, quantity, 'search');
+      console.log('✅ Add to cart tracked with dynamic updates');
+      console.log(`🛒 Added to cart: ${quantity}x ${product.name} (${product.category}) - Grade: ${product.sustainabilityGrade}`);
+      
+      // Refresh personalized recommendations after tracking
+      await refreshPersonalizedRecommendations();
+    } catch (error) {
+      console.error('Error tracking add to cart with dynamic system:', error);
+      // Don't fail the add to cart, just log the error
+    }
+
     Alert.alert(
       'Added to Cart',
       `${quantity} × ${product.name} added to your cart!`,
@@ -107,7 +135,29 @@ const CustomerDashboard = ({ navigation }) => {
     console.log('Current personalized products count:', personalizedProducts.length);
   }, [showPersonalized, products.length, personalizedProducts.length]);
 
-  // Load personalized recommendations with search history integration
+  // Refresh personalized recommendations after user interactions
+  const refreshPersonalizedRecommendations = useCallback(async () => {
+    if (!user || !auth) {
+      console.log('No user or auth token available for refreshing recommendations');
+      return;
+    }
+    
+    try {
+      console.log('🔄 Refreshing personalized recommendations after user interaction...');
+      
+      // Get fresh dynamic recommendations
+      const dynamicResponse = await DynamicRecommendationService.getRealTimeRecommendations(20);
+      if (dynamicResponse.recommendations && dynamicResponse.recommendations.length > 0) {
+        setPersonalizedProducts(dynamicResponse.recommendations);
+        console.log(`✅ Refreshed ${dynamicResponse.recommendations.length} personalized recommendations`);
+        console.log(`🔍 New sample recommendations:`, dynamicResponse.recommendations.slice(0, 3).map(p => ({ name: p.name, category: p.category, grade: p.sustainabilityGrade })));
+      }
+    } catch (error) {
+      console.error('Error refreshing personalized recommendations:', error);
+    }
+  }, [user, auth]);
+
+  // Load personalized recommendations with dynamic updates
   const loadPersonalizedRecommendations = async () => {
     if (!user || !auth) {
       console.log('No user or auth token available for personalized recommendations');
@@ -115,11 +165,59 @@ const CustomerDashboard = ({ navigation }) => {
     }
     
     try {
-      // First check if survey is completed
+      // First check survey completion status (this should always be done)
       const statusResponse = await SurveyService.checkSurveyStatus(user.id, auth);
-      setSurveyCompleted(statusResponse.completed);
+      console.log('📊 Survey status from server:', statusResponse);
       
-      // Get enhanced recommendations combining survey and search data
+      // Also check AsyncStorage for local survey completion status
+      try {
+        const localSurveyCompleted = await AsyncStorage.getItem('@eco_lens_survey_completed');
+        const localSurveySkipped = await AsyncStorage.getItem('@eco_lens_survey_skipped');
+        console.log('📱 Local survey status - completed:', localSurveyCompleted, 'skipped:', localSurveySkipped);
+        
+        // Use server status as primary source, but fallback to local if server says not completed
+        const finalSurveyStatus = statusResponse.completed || localSurveyCompleted === 'true';
+        setSurveyCompleted(finalSurveyStatus);
+        console.log('✅ Final survey completion status:', finalSurveyStatus);
+      } catch (storageError) {
+        console.error('Error checking local survey status:', storageError);
+        setSurveyCompleted(statusResponse.completed);
+      }
+
+      // Then try to get dynamic real-time recommendations
+      try {
+        const dynamicResponse = await DynamicRecommendationService.getRealTimeRecommendations(20);
+        if (dynamicResponse.recommendations && dynamicResponse.recommendations.length > 0) {
+          setPersonalizedProducts(dynamicResponse.recommendations);
+          console.log(`✅ Loaded ${dynamicResponse.recommendations.length} dynamic real-time recommendations`);
+          console.log(`🎯 Recommendation source: ${dynamicResponse.source || 'dynamic'}`);
+          console.log(`📊 Confidence score: ${dynamicResponse.confidenceScore || 'N/A'}%`);
+          console.log(`🔍 Sample recommendations:`, dynamicResponse.recommendations.slice(0, 3).map(p => ({ name: p.name, category: p.category, grade: p.sustainabilityGrade })));
+          
+          // Also get behavior insights
+          try {
+            const insights = await DynamicRecommendationService.getBehaviorInsights();
+            setSearchInsights(insights.insights);
+            console.log('✅ Loaded dynamic behavior insights');
+          } catch (insightError) {
+            console.error('Error loading dynamic behavior insights:', insightError);
+          }
+          
+          return; // Use dynamic recommendations if available
+        }
+      } catch (dynamicError) {
+        console.error('Error loading dynamic recommendations:', dynamicError);
+        // Don't fail completely, just fall back to enhanced recommendations
+        if (dynamicError.message.includes('Authentication required')) {
+          console.log('Authentication required for dynamic recommendations, using enhanced recommendations');
+        } else if (dynamicError.message.includes('Failed to fetch')) {
+          console.log('Network error with dynamic recommendations, using enhanced recommendations');
+        } else {
+          console.log('Dynamic recommendations not available, using enhanced recommendations');
+        }
+      }
+
+      // Fallback to enhanced recommendations
       const response = await EnhancedRecommendationService.getEnhancedRecommendations(
         user.id, 
         auth, 
@@ -147,7 +245,6 @@ const CustomerDashboard = ({ navigation }) => {
         console.log('✅ Loaded search behavior insights');
       } catch (insightError) {
         console.error('Error loading search insights:', insightError);
-        // Don't fail the entire function if search insights fail
         if (insightError.message.includes('Access token required')) {
           console.log('Authentication required for search insights, skipping...');
         }
@@ -234,23 +331,42 @@ const CustomerDashboard = ({ navigation }) => {
     return orderMap[sortOption] || 'desc';
   };
 
-  // Handle search with tracking
+  // Handle search with dynamic tracking
   const handleSearch = useCallback(async (query) => {
     setSearchQuery(query);
     setShowSuggestions(false);
     
     if (query.length >= 2) {
       try {
-        // Track the search
+        // Track the search with dynamic recommendations
+        await DynamicRecommendationService.trackSearch({
+          searchQuery: query,
+          category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          resultsCount: 0, // Will be updated after search
+          sessionId: `session_${Date.now()}`,
+          userAgent: 'mobile_app'
+        });
+        console.log('✅ Search tracked with dynamic updates:', query);
+        console.log(`🔍 Search query: "${query}" - Category: ${selectedCategory !== 'All' ? selectedCategory : 'All'} - Filter: ${selectedFilter}`);
+        
+        // Refresh personalized recommendations after tracking
+        await refreshPersonalizedRecommendations();
+      } catch (error) {
+        console.error('Error tracking search with dynamic system:', error);
+        // Don't fail the search, just log the error
+      }
+
+      try {
+        // Also track with legacy system for backward compatibility
         const searchData = await SearchAnalyticsService.searchWithTracking(query, {
           category: selectedCategory !== 'All' ? selectedCategory : undefined,
           sustainabilityGrade: selectedFilter === 'eco-friendly' ? 'A' : undefined
         });
         
         setCurrentSearchId(searchData.searchId);
-        console.log('✅ Search tracked:', query);
+        console.log('✅ Search tracked with legacy system:', query);
       } catch (error) {
-        console.error('Error tracking search:', error);
+        console.error('Error tracking search with legacy system:', error);
         // Don't fail the search if tracking fails
         if (error.message.includes('Access token required')) {
           console.log('Authentication required for search tracking, continuing without tracking...');
@@ -304,9 +420,14 @@ const CustomerDashboard = ({ navigation }) => {
     console.log('- personalizedProducts.length:', personalizedProducts.length);
     console.log('- products.length:', products.length);
     
-    if (showPersonalized && surveyCompleted && personalizedProducts.length > 0) {
-      console.log('Returning personalized products');
-      return personalizedProducts;
+    if (showPersonalized && surveyCompleted) {
+      if (personalizedProducts.length > 0) {
+        console.log('Returning personalized products');
+        return personalizedProducts;
+      } else {
+        console.log('Survey completed but no personalized products yet, returning all products');
+        return products;
+      }
     }
     console.log('Returning all products');
     return products;
@@ -497,15 +618,18 @@ const CustomerDashboard = ({ navigation }) => {
         </View>
 
         {/* Personalized Recommendations Header */}
-        {surveyCompleted && personalizedProducts.length > 0 ? (
+        {surveyCompleted ? (
           <View style={styles.personalizedHeader}>
             <View style={styles.personalizedTitleContainer}>
               <Text style={styles.personalizedTitle}>🌟 Recommended for You</Text>
               <Text style={styles.personalizedSubtitle}>
-                {recommendationInsights ? 
-                  `Based on your ${recommendationInsights.totalRecommendations} searches and preferences` :
-                  'Based on your preferences'
-                }
+                {personalizedProducts.length > 0 ? (
+                  recommendationInsights ? 
+                    `Based on your ${recommendationInsights.totalRecommendations} searches and preferences` :
+                    'Based on your preferences'
+                ) : (
+                  'Loading personalized recommendations...'
+                )}
               </Text>
               {recommendationInsights && (
                 <View style={styles.insightsRow}>
@@ -528,7 +652,7 @@ const CustomerDashboard = ({ navigation }) => {
               }}
             >
               <Text style={styles.toggleButtonText}>
-                {showPersonalized ? 'Show All ' : 'Show Personalized'}
+                {showPersonalized ? 'Show All' : 'Show Personalized'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -539,6 +663,7 @@ const CustomerDashboard = ({ navigation }) => {
               <Text style={styles.surveyPromptSubtitle}>
                 Complete a quick survey to see personalized product recommendations
               </Text>
+              <Text style={styles.debugText}>DEBUG: surveyCompleted = {surveyCompleted.toString()}</Text>
             </View>
             <TouchableOpacity
               style={styles.completeSurveyButton}
@@ -1049,6 +1174,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xs,
     paddingVertical: 2,
     borderRadius: theme.borderRadius.s,
+  },
+  
+  debugText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: 'red',
+    fontWeight: 'bold',
+    marginTop: theme.spacing.xs,
   },
 });
 

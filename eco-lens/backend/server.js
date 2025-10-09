@@ -12,6 +12,7 @@ const productRoutes = require('./routes/productRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
+const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -531,6 +532,9 @@ app.use('/api/survey', surveyRoutes);
 
 // Search Analytics Routes
 app.use('/api/search', searchAnalyticsRoutes);
+
+// Dynamic Recommendation Routes
+app.use('/api/dynamic', dynamicRecommendationRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

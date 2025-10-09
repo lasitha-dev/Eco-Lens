@@ -177,12 +177,12 @@ router.post('/submit', authenticateToken, async (req, res) => {
       completedAt: new Date(),
       preferences: {
         productInterests,
-        shoppingFrequency: shoppingFrequency.toLowerCase().replace(' ', '-'),
-        shoppingPurpose: shoppingPurpose.toLowerCase().replace(' ', '-'),
-        priceRange: priceRange.toLowerCase().replace(' ', '-'),
+        shoppingFrequency: shoppingFrequency, // Keep original case
+        shoppingPurpose: shoppingPurpose, // Keep original case
+        priceRange: priceRange, // Keep original case
         wantsDeals: wantsDeals === 'Yes',
         preferredDevices: preferredDevices.map(device => device.toLowerCase()),
-        suggestionType: suggestionType.toLowerCase().replace(' ', '-'),
+        suggestionType: suggestionType, // Keep original case
         ecoFriendlyPreference: ecoFriendlyPreference.toLowerCase().replace(' ', '-'),
         interestedInNewProducts: interestedInNewProducts === 'Yes',
         dashboardCategories
@@ -191,14 +191,22 @@ router.post('/submit', authenticateToken, async (req, res) => {
 
     // Generate personalized recommendations
     const recommendations = await generatePersonalizedRecommendations(preferencesData.preferences);
+    
+    console.log(`🎯 Generated ${recommendations.length} personalized recommendations for user ${userId}`);
+    console.log(`📊 User preferences:`, {
+      categories: dashboardCategories,
+      priceRange: preferencesData.preferences.priceRange,
+      ecoFriendly: preferencesData.preferences.ecoFriendlyPreference
+    });
+    console.log(`🔍 Sample recommendations:`, recommendations.slice(0, 3).map(r => ({ name: r.name, category: r.category, price: r.price })));
 
     preferencesData.aiRecommendations = {
       lastUpdated: new Date(),
       recommendedProducts: recommendations.map(rec => rec._id),
       personalizedFilters: {
         categories: dashboardCategories,
-        priceRange: priceRange.toLowerCase().replace(' ', '-'),
-        ecoFriendly: ecoFriendlyPreference.toLowerCase().replace(' ', '-') === 'yes'
+        priceRange: preferencesData.preferences.priceRange,
+        sustainabilityGrade: preferencesData.preferences.ecoFriendlyPreference === 'yes' ? ['A', 'B'] : ['A', 'B', 'C']
       },
       engagementScore: 0
     };
@@ -296,32 +304,46 @@ router.put('/update/:userId', authenticateToken, async (req, res) => {
 // Helper function to generate personalized recommendations
 async function generatePersonalizedRecommendations(preferences) {
   try {
+    console.log('🎯 Generating personalized recommendations with preferences:', {
+      dashboardCategories: preferences.dashboardCategories,
+      priceRange: preferences.priceRange,
+      ecoFriendlyPreference: preferences.ecoFriendlyPreference,
+      productInterests: preferences.productInterests
+    });
+
     let query = { isActive: true };
 
     // Filter by preferred categories
     if (preferences.dashboardCategories && preferences.dashboardCategories.length > 0) {
       query.category = { $in: preferences.dashboardCategories };
+      console.log(`📂 Filtering by categories: ${preferences.dashboardCategories.join(', ')}`);
     }
 
     // Filter by price range
-    if (preferences.priceRange === 'budget') {
+    if (preferences.priceRange === 'budget' || preferences.priceRange === 'Budget-friendly') {
       query.price = { $lt: 25 };
-    } else if (preferences.priceRange === 'mid-range') {
+      console.log('💰 Filtering by budget price range (< $25)');
+    } else if (preferences.priceRange === 'mid-range' || preferences.priceRange === 'Mid-range') {
       query.price = { $gte: 25, $lte: 100 };
-    } else if (preferences.priceRange === 'premium') {
+      console.log('💰 Filtering by mid-range price ($25-$100)');
+    } else if (preferences.priceRange === 'premium' || preferences.priceRange === 'Premium') {
       query.price = { $gt: 100 };
+      console.log('💰 Filtering by premium price range (> $100)');
     }
 
     // Filter by eco-friendly preference
     if (preferences.ecoFriendlyPreference === 'yes') {
       query.sustainabilityGrade = { $in: ['A', 'B'] };
+      console.log('🌱 Filtering by eco-friendly products (Grade A & B)');
     }
 
     // Get products matching preferences
     let products = await Product.find(query);
+    console.log(`🔍 Found ${products.length} products matching user preferences`);
 
-    // If no products match, get all products
+    // If no products match, get all products but still apply scoring
     if (products.length === 0) {
+      console.log('⚠️ No products match exact preferences, using all products with scoring');
       products = await Product.find({ isActive: true });
     }
 
@@ -333,6 +355,14 @@ async function generatePersonalizedRecommendations(preferences) {
 
     // Sort by recommendation score
     scoredProducts.sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    console.log(`✅ Generated ${scoredProducts.length} scored recommendations`);
+    console.log(`🏆 Top 3 recommendations:`, scoredProducts.slice(0, 3).map(p => ({
+      name: p.name,
+      category: p.category,
+      score: p.recommendationScore,
+      price: p.price
+    })));
 
     return scoredProducts;
 
@@ -373,6 +403,10 @@ function calculateRecommendationScore(product, preferences) {
   )) {
     score += 20;
   }
+
+  // Base product quality score (bonus)
+  score += (product.rating || 0) * 2;
+  score += (product.sustainabilityScore || 0) * 0.1;
 
   return Math.min(score, 100);
 }

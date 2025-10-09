@@ -29,17 +29,17 @@ const userPreferencesSchema = new mongoose.Schema({
     }],
     shoppingFrequency: {
       type: String,
-      enum: ['daily', 'weekly', 'occasionally', 'sales-only'],
+      enum: ['daily', 'weekly', 'occasionally', 'Occasionally', 'sales-only'],
       default: 'occasionally'
     },
     shoppingPurpose: {
       type: String,
-      enum: ['personal', 'gifts', 'business', 'browsing'],
+      enum: ['personal', 'Personal use', 'gifts', 'business', 'browsing'],
       default: 'personal'
     },
     priceRange: {
       type: String,
-      enum: ['budget', 'mid-range', 'premium'],
+      enum: ['budget', 'Budget-friendly', 'mid-range', 'Mid-range', 'premium', 'Premium'],
       default: 'mid-range'
     },
     wantsDeals: {
@@ -52,7 +52,7 @@ const userPreferencesSchema = new mongoose.Schema({
     }],
     suggestionType: {
       type: String,
-      enum: ['trends', 'activity', 'both', 'none'],
+      enum: ['trends', 'activity', 'both', 'Both', 'yes,-based on trends', 'none'],
       default: 'both'
     },
     ecoFriendlyPreference: {
