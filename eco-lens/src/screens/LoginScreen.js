@@ -214,21 +214,24 @@ const LoginScreen = ({ navigation }) => {
       console.log('Attempting Google login with ID token');
       const result = await AuthService.googleLogin(idToken);
       console.log('Google login successful:', result);
-      await setAuth(result);
       
       if (result.user.role === 'admin') {
         console.log('✅ Admin Google login detected');
         
         // Check if fingerprint is enabled for this admin
         if (result.user.fingerprintEnabled) {
-          console.log('🔐 Fingerprint enabled - prompting for biometric auth');
+          console.log('🔐 Fingerprint enabled - prompting for biometric auth BEFORE setting auth');
+          // IMPORTANT: Don't call setAuth() yet - wait for fingerprint success
           await handleBiometricAuth(result);
         } else {
-          console.log('✅ Fingerprint not enabled - redirecting to AdminDashboard');
-          navigation.navigate('AdminDashboard');
+          console.log('✅ Fingerprint not enabled - setting auth and redirecting');
+          await setAuth(result);
           setLoading(false);
+          navigation.navigate('AdminDashboard');
         }
       } else {
+        // For customers, set auth immediately
+        await setAuth(result);
         try {
           const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
           if (!surveyStatus.completed) {
@@ -347,11 +350,13 @@ const LoginScreen = ({ navigation }) => {
       );
 
       if (authResult.success) {
-        console.log('✅ Biometric authentication successful - redirecting to AdminDashboard');
+        console.log('✅ Biometric authentication successful - NOW setting auth and redirecting');
+        // NOW set auth state (this will store token and trigger navigation)
+        await setAuth(loginResult);
         // Store credentials for future quick auth
         await BiometricAuthService.storeCredentialsForBiometric(loginResult.user.email);
-        navigation.navigate('AdminDashboard');
         setLoading(false);
+        navigation.navigate('AdminDashboard');
       } else {
         setLoading(false);
         Alert.alert(
@@ -360,14 +365,19 @@ const LoginScreen = ({ navigation }) => {
           [
             {
               text: 'Retry',
-              onPress: () => handleBiometricAuth(loginResult)
+              onPress: () => {
+                setLoading(true);
+                handleBiometricAuth(loginResult);
+              }
             },
             {
               text: 'Cancel',
               style: 'cancel',
               onPress: async () => {
-                // Logout on cancel
+                // Logout on cancel - clear auth state
                 await AuthService.logoutUser();
+                setEmail('');
+                setPassword('');
               }
             }
           ]
@@ -413,23 +423,24 @@ const LoginScreen = ({ navigation }) => {
       const result = await AuthService.loginUser(email, password);
       console.log('Login successful:', result);
       
-      // Set auth context with the result
-      await setAuth(result);
-      
       // Navigate based on user role
       if (result.user.role === 'admin') {
         console.log('✅ Admin login detected');
         
         // Check if fingerprint is enabled for this admin
         if (result.user.fingerprintEnabled) {
-          console.log('🔐 Fingerprint enabled - prompting for biometric auth');
+          console.log('🔐 Fingerprint enabled - prompting for biometric auth BEFORE setting auth');
+          // IMPORTANT: Don't call setAuth() yet - wait for fingerprint success
           await handleBiometricAuth(result);
         } else {
-          console.log('✅ Fingerprint not enabled - redirecting to AdminDashboard');
-          navigation.navigate('AdminDashboard');
+          console.log('✅ Fingerprint not enabled - setting auth and redirecting to AdminDashboard');
+          await setAuth(result);
           setLoading(false);
+          navigation.navigate('AdminDashboard');
         }
       } else {
+        // For customers, set auth immediately
+        await setAuth(result);
         // Check if customer has completed or skipped the survey
         try {
           // First check if user has completed or skipped the survey locally
