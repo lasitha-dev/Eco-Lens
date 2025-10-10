@@ -15,9 +15,11 @@ import {
   Alert,
   Dimensions,
   Platform,
-  Image
+  Image,
+  Modal
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuthLogin';
+import SearchAnalyticsDashboard from '../../components/SearchAnalyticsDashboard';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 
@@ -46,6 +48,7 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSearchAnalytics, setShowSearchAnalytics] = useState(false);
 
 
   // Handle logout with confirmation
@@ -89,12 +92,20 @@ const ProfileScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('EditProfile'),
     },
     {
+      id: 'search_analytics',
+      title: 'Search Analytics',
+      subtitle: 'View your search patterns and insights',
+      icon: '📊',
+      iconColor: '#2196F3',
+      onPress: () => setShowSearchAnalytics(true),
+    },
+    {
       id: 'orders',
       title: 'Order History',
       subtitle: 'View your past purchases',
       icon: '📦',
       iconColor: '#FF9800',
-      onPress: () => Alert.alert('Coming Soon', 'Order history will be available in a future update.'),
+      onPress: () => navigation.navigate('OrderHistory'),
     },
     {
       id: 'sustainability',
@@ -185,6 +196,20 @@ const ProfileScreen = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Search Analytics Modal */}
+      <Modal
+        visible={showSearchAnalytics}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSearchAnalytics(false)}
+      >
+        <SearchAnalyticsDashboard
+          userId={user?.id}
+          authToken={user?.token}
+          onClose={() => setShowSearchAnalytics(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };

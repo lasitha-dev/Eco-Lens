@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import EcoGradeBadge from './EcoGradeBadge';
+import FavoriteIcon from '../FavoriteIcon';
 import theme from '../../styles/theme';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -45,13 +46,6 @@ const ProductCard = memo(({
       onPress={() => onPress(product)}
       activeOpacity={0.7}
     >
-      {/* Eco-friendly indicator */}
-      {isEcoFriendly && (
-        <View style={styles.ecoIndicator}>
-          <Text style={styles.ecoIndicatorText}>ECO</Text>
-        </View>
-      )}
-      
       {/* Product Image */}
       <View style={styles.imageContainer}>
         <Image 
@@ -59,10 +53,20 @@ const ProductCard = memo(({
           style={styles.gridImage}
           resizeMode="cover"
         />
+        {/* Favorite Icon positioned on image */}
+        <View style={styles.favoritePosition}>
+          <FavoriteIcon product={product} size={20} />
+        </View>
         {/* Eco Grade Badge positioned on image */}
         <View style={styles.badgePosition}>
           <EcoGradeBadge grade={sustainabilityGrade} size="small" />
         </View>
+        {/* Eco-friendly indicator positioned on image */}
+        {isEcoFriendly && (
+          <View style={styles.ecoIndicator}>
+            <Text style={styles.ecoIndicatorText}>ECO</Text>
+          </View>
+        )}
       </View>
       
       {/* Product Info */}
@@ -112,7 +116,10 @@ const ProductCard = memo(({
             <Text style={styles.productName} numberOfLines={2}>
               {name}
             </Text>
-            <EcoGradeBadge grade={sustainabilityGrade} size="small" />
+            <View style={styles.listBadges}>
+              <FavoriteIcon product={product} size={20} style={styles.listFavoriteIcon} />
+              <EcoGradeBadge grade={sustainabilityGrade} size="small" />
+            </View>
           </View>
           <Text style={styles.category}>{category}</Text>
         </View>
@@ -164,7 +171,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: theme.borderRadius.m,
     overflow: 'hidden',
   },
-  
   gridImage: {
     width: '100%',
     height: '100%',
@@ -176,9 +182,18 @@ const styles = StyleSheet.create({
     right: theme.spacing.s,
   },
   
-  ecoIndicator: {
+  favoritePosition: {
     position: 'absolute',
     top: theme.spacing.s,
+    left: theme.spacing.s,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: theme.spacing.xs,
+  },
+  
+  ecoIndicator: {
+    position: 'absolute',
+    bottom: theme.spacing.s,
     left: theme.spacing.s,
     backgroundColor: theme.colors.primary,
     paddingHorizontal: theme.spacing.s,
@@ -229,6 +244,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: theme.spacing.xs,
+  },
+  
+  listBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  listFavoriteIcon: {
+    marginRight: theme.spacing.s,
   },
   
   listFooter: {

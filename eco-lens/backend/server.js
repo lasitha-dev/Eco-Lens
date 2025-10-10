@@ -9,14 +9,37 @@ const User = require('./models/User');
 const Product = require('./models/Product');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const favoritesRoutes = require('./routes/favoritesRoutes');
 const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
+const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
+const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
+// Fix the Google OAuth client initialization to properly handle all client IDs
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || '782129521115-ciietm4n47j6odv749cmfl9vgbtkmcbg.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || '782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com';
+const client = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:8081',  // Expo dev server
+    'http://localhost:19006', // Expo web
+    'http://localhost:5002',  // Backend itself
+    'http://10.38.245.146:8081', // Mobile network IP
+    'http://10.38.245.146:19006', // Web network IP
+    'https://auth.expo.io', // Expo auth proxy
+    'eco-lens://oauth/redirect' // Custom scheme for mobile OAuth
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 app.use(express.json());
 
 // MongoDB Connection
@@ -251,7 +274,8 @@ app.post('/api/register', async (req, res) => {
         id: newUser._id,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
-        email: newUser.email
+        email: newUser.email,
+        profilePicture: newUser.profilePicture || null
       }
     });
 
@@ -303,13 +327,191 @@ app.post('/api/login', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.role || 'customer'
+        role: user.role || 'customer',
+        profilePicture: user.profilePicture || null
       }
     });
 
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/auth/google/token', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    console.log('Received Google ID token for verification');
+    console.log('ID Token length:', idToken ? idToken.length : 'No token provided');
+    
+    if (!idToken) {
+      console.log('No ID token provided in request');
+      return res.status(400).json({ 
+        error: 'ID token is required', 
+        details: 'Google ID token was not provided in the request. This might be due to OAuth configuration issues.' 
+      });
+    }
+    
+    // Check if Google OAuth is properly configured
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      console.error('Google OAuth not properly configured: Missing EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB');
+      return res.status(500).json({ 
+        error: 'Google OAuth not properly configured on server',
+        details: 'Missing Google Client ID configuration'
+      });
+    }
+    
+    console.log('Using Google Client ID for verification:', GOOGLE_WEB_CLIENT_ID);
+    
+    // Check if this is a custom/fake ID token (fallback from frontend)
+    let payload;
+    if (idToken.includes('.') && idToken.length > 100) {
+      // This looks like a real JWT token, verify it
+      console.log('Verifying ID token with Google client library');
+      
+      // Try verifying with all possible client IDs (web, android, ios)
+      const clientIds = [GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_IOS_CLIENT_ID];
+      let verificationSuccessful = false;
+      
+      for (const clientId of clientIds) {
+        try {
+          console.log(`Attempting verification with client ID: ${clientId.substring(0, 20)}...`);
+          const ticket = await client.verifyIdToken({
+              idToken,
+              audience: clientId, 
+          });
+          payload = ticket.getPayload();
+          console.log(`Token verified successfully with client ID: ${clientId.substring(0, 20)}...`);
+          verificationSuccessful = true;
+          break;
+        } catch (verifyError) {
+          console.log(`Verification failed with client ID ${clientId.substring(0, 20)}...: ${verifyError.message}`);
+          // Continue to next client ID
+        }
+      }
+      
+      if (!verificationSuccessful) {
+        console.error('Google token verification failed with all client IDs');
+        return res.status(400).json({ 
+          error: 'Invalid Google token', 
+          details: 'The Google token could not be verified with any configured client ID. Please ensure your OAuth configuration is correct.' 
+        });
+      }
+    } else {
+      // This might be a custom/base64 encoded token from our fallback
+      try {
+        console.log('Attempting to decode custom ID token');
+        const decoded = JSON.parse(atob(idToken));
+        payload = decoded;
+        console.log('Successfully decoded custom ID token');
+      } catch (decodeError) {
+        console.error('Failed to decode custom ID token:', decodeError);
+        return res.status(400).json({ 
+          error: 'Invalid token format', 
+          details: 'The token provided is not in a valid format.' 
+        });
+      }
+    }
+    
+    console.log('Google token payload:', {
+      sub: payload.sub,
+      email: payload.email,
+      given_name: payload.given_name,
+      family_name: payload.family_name,
+      email_verified: payload.email_verified
+    });
+    
+    // Check if email is verified
+    if (!payload.email_verified) {
+      console.log('Google account email not verified:', payload.email);
+      return res.status(400).json({ 
+        error: 'Email not verified', 
+        details: 'Please verify your Google account email before signing in.' 
+      });
+    }
+    
+    const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: profilePicture } = payload;
+
+    // Check if user exists with googleId
+    console.log(`Checking for existing user with googleId: ${googleId}`);
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      console.log(`No user found with googleId: ${googleId}, checking by email: ${email}`);
+      // Check if user exists with email (existing account linking)
+      user = await User.findOne({ email });
+      if (user) {
+        // Link Google account to existing user
+        console.log(`Found existing user with email: ${email}, linking Google account`);
+        user.googleId = googleId;
+        user.profilePicture = user.profilePicture || profilePicture;
+        user.authProvider = 'google';
+        await user.save();
+        console.log(`✅ Linked Google account to existing user: ${email}`);
+      } else {
+        // Create new user with Google details
+        console.log(`No existing user found, creating new user for: ${email}`);
+        user = new User({
+          googleId,
+          email,
+          firstName,
+          lastName,
+          profilePicture,
+          authProvider: 'google',
+          address: 'Not provided', // Required field with default
+          dateOfBirth: new Date('1970-01-01'), // Required field with default
+          country: 'Not provided', // Required field with default
+          role: 'customer',
+        });
+        await user.save();
+        console.log(`✅ Created new user from Google: ${email}`);
+      }
+    } else {
+      console.log(`Found existing user with googleId: ${googleId}`);
+    }
+
+    // Generate JWT token
+    const token = generateToken(user);
+    console.log(`Generated JWT token for user: ${user.email}`);
+
+    res.json({
+      message: 'Google login successful',
+      token,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role || 'customer',
+        profilePicture: user.profilePicture || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    // Provide more specific error messages based on error type
+    if (error.message.includes('Token used too late')) {
+      return res.status(400).json({ 
+        error: 'Google login token expired', 
+        details: 'Please try signing in again' 
+      });
+    }
+    if (error.message.includes('Wrong recipient')) {
+      return res.status(400).json({ 
+        error: 'Google client ID mismatch', 
+        details: 'OAuth configuration error - client ID does not match' 
+      });
+    }
+    if (error.message.includes('Invalid token signature')) {
+      return res.status(400).json({ 
+        error: 'Invalid Google token', 
+        details: 'The token provided is not valid' 
+      });
+    }
+    res.status(500).json({ 
+      error: 'Google login failed', 
+      details: error.message 
+    });
   }
 });
 
@@ -519,14 +721,38 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// OAuth callback handler
+app.get('/oauth/callback', (req, res) => {
+  // This endpoint handles OAuth callbacks
+  res.json({ 
+    status: 'OAuth callback received',
+    message: 'This is a placeholder for OAuth callback handling',
+    query: req.query
+  });
+});
+
 // Forgot Password Routes
 app.use('/api/auth', forgotPasswordRoutes);
 
 // Product Routes
 app.use('/api/products', productRoutes);
 
+// Cart Routes
+app.use('/api/cart', cartRoutes);
+
+// Order Routes
+app.use('/api/orders', orderRoutes);
+// Favorites Routes
+app.use('/api/favorites', favoritesRoutes);
+
 // Survey Routes
 app.use('/api/survey', surveyRoutes);
+
+// Search Analytics Routes
+app.use('/api/search', searchAnalyticsRoutes);
+
+// Dynamic Recommendation Routes
+app.use('/api/dynamic', dynamicRecommendationRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

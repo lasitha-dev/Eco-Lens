@@ -81,17 +81,29 @@ export const AuthProvider = ({ children }) => {
       await AuthService.logoutUser();
       await setAuth(null);
     } catch (error) {
-      console.error('Error during logout:', error);
       // Force clear even if there's an error
       await setAuth(null);
     }
   };
 
-  const updateUser = (updatedUserData) => {
-    const updatedUser = { ...user, ...updatedUserData };
-    setUser(updatedUser);
-    setIsAdmin(updatedUser.role === 'admin');
-    setIsCustomer(updatedUser.role === 'customer');
+  const updateUser = async (updatedUserData) => {
+    try {
+      const updatedUser = { ...user, ...updatedUserData };
+      setUser(updatedUser);
+      setIsAdmin(updatedUser.role === 'admin');
+      setIsCustomer(updatedUser.role === 'customer');
+
+      // Persist the updated user data to AsyncStorage
+      await AsyncStorage.setItem(AuthService.USER_KEY, JSON.stringify(updatedUser));
+      console.log('✅ User data updated and persisted to storage');
+    } catch (error) {
+      console.error('Error updating user data:', error);
+      // Still update in-memory state even if storage fails
+      const updatedUser = { ...user, ...updatedUserData };
+      setUser(updatedUser);
+      setIsAdmin(updatedUser.role === 'admin');
+      setIsCustomer(updatedUser.role === 'customer');
+    }
   };
 
   const checkAdminAccess = () => {

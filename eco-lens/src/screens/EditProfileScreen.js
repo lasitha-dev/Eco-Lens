@@ -111,6 +111,9 @@ const EditProfileScreen = ({ navigation }) => {
       } else {
         setDisplayImageUri(null);
       }
+
+      // Update global user state with latest data
+      await updateUser(userData);
     } catch (error) {
       console.error('Error loading profile:', error);
       Alert.alert('Error', 'Failed to load profile data. Please try again.');

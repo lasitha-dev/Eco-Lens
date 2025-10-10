@@ -23,21 +23,34 @@ const userSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    required: true,
+    default: 'Not provided', // For Google OAuth users
     trim: true
   },
   dateOfBirth: {
     type: Date,
-    required: true
+    default: Date.now // For Google OAuth users
   },
   country: {
     type: String,
-    required: true
+    default: 'Not provided' // For Google OAuth users
   },
   password: {
     type: String,
-    required: true,
     minlength: 8
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
+  },
+  profilePictureUrl: {
+    type: String,
+    default: null
   },
   phone: {
     type: String,
@@ -61,6 +74,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  favorites: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  }],
   createdAt: {
     type: Date,
     default: Date.now
