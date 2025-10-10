@@ -19,6 +19,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import AuthService from '../api/authService';
 import SurveyService from '../api/surveyService';
+import BiometricAuthService from '../services/BiometricAuthService';
 import { useAuth } from '../hooks/useAuthLogin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -216,7 +217,17 @@ const LoginScreen = ({ navigation }) => {
       await setAuth(result);
       
       if (result.user.role === 'admin') {
-        navigation.navigate('AdminDashboard');
+        console.log('✅ Admin Google login detected');
+        
+        // Check if fingerprint is enabled for this admin
+        if (result.user.fingerprintEnabled) {
+          console.log('🔐 Fingerprint enabled - prompting for biometric auth');
+          await handleBiometricAuth(result);
+        } else {
+          console.log('✅ Fingerprint not enabled - redirecting to AdminDashboard');
+          navigation.navigate('AdminDashboard');
+          setLoading(false);
+        }
       } else {
         try {
           const surveyStatus = await SurveyService.checkSurveyStatus(result.user.id, result.token);
@@ -328,6 +339,47 @@ const LoginScreen = ({ navigation }) => {
     return () => pulseAnimation.stop();
   }, []);
 
+  const handleBiometricAuth = async (loginResult) => {
+    try {
+      const biometricType = await BiometricAuthService.getBiometricTypeName();
+      const authResult = await BiometricAuthService.authenticate(
+        `Use ${biometricType} to access Admin Dashboard`
+      );
+
+      if (authResult.success) {
+        console.log('✅ Biometric authentication successful - redirecting to AdminDashboard');
+        // Store credentials for future quick auth
+        await BiometricAuthService.storeCredentialsForBiometric(loginResult.user.email);
+        navigation.navigate('AdminDashboard');
+        setLoading(false);
+      } else {
+        setLoading(false);
+        Alert.alert(
+          'Authentication Failed',
+          authResult.error || 'Biometric authentication failed. Please try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: () => handleBiometricAuth(loginResult)
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: async () => {
+                // Logout on cancel
+                await AuthService.logoutUser();
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Biometric auth error:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to authenticate with biometric. Please try again.');
+    }
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Missing Information', 'Please enter both email and password to continue.');
@@ -366,8 +418,17 @@ const LoginScreen = ({ navigation }) => {
       
       // Navigate based on user role
       if (result.user.role === 'admin') {
-        console.log('✅ Admin login - redirecting to AdminDashboard');
-        navigation.navigate('AdminDashboard');
+        console.log('✅ Admin login detected');
+        
+        // Check if fingerprint is enabled for this admin
+        if (result.user.fingerprintEnabled) {
+          console.log('🔐 Fingerprint enabled - prompting for biometric auth');
+          await handleBiometricAuth(result);
+        } else {
+          console.log('✅ Fingerprint not enabled - redirecting to AdminDashboard');
+          navigation.navigate('AdminDashboard');
+          setLoading(false);
+        }
       } else {
         // Check if customer has completed or skipped the survey
         try {
@@ -378,12 +439,14 @@ const LoginScreen = ({ navigation }) => {
           if (surveyCompleted === 'true') {
             console.log('✅ Customer login - survey was completed, redirecting to Dashboard');
             navigation.navigate('Dashboard');
+            setLoading(false);
             return;
           }
           
           if (surveySkipped === 'true') {
             console.log('✅ Customer login - survey was skipped, redirecting to Dashboard');
             navigation.navigate('Dashboard');
+            setLoading(false);
             return;
           }
 
@@ -398,20 +461,21 @@ const LoginScreen = ({ navigation }) => {
             console.log('✅ Customer login - redirecting to Dashboard');
             navigation.navigate('Dashboard');
           }
+          setLoading(false);
         } catch (error) {
           console.error('Error checking survey status:', error);
           // If survey check fails, go to dashboard
           navigation.navigate('Dashboard');
+          setLoading(false);
         }
       }
     } catch (error) {
+      setLoading(false);
       Alert.alert(
         'Login Failed', 
         error.message || 'Unable to sign in. Please check your credentials and try again.',
         [{ text: 'Try Again', style: 'default' }]
       );
-    } finally {
-      setLoading(false);
     }
   };
 

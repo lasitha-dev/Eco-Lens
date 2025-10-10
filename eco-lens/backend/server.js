@@ -328,7 +328,8 @@ app.post('/api/login', async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role || 'customer',
-        profilePicture: user.profilePicture || null
+        profilePicture: user.profilePicture || null,
+        fingerprintEnabled: user.fingerprintEnabled || false
       }
     });
 
@@ -483,7 +484,8 @@ app.post('/api/auth/google/token', async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role || 'customer',
-        profilePicture: user.profilePicture || null
+        profilePicture: user.profilePicture || null,
+        fingerprintEnabled: user.fingerprintEnabled || false
       }
     });
 
@@ -536,7 +538,9 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
         country: user.country,
         phone: user.phone,
         gender: user.gender,
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        role: user.role,
+        fingerprintEnabled: user.fingerprintEnabled || false
       }
     });
 
@@ -580,6 +584,39 @@ app.post('/api/profile/delete-photo', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Profile photo delete error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update fingerprint setting
+app.patch('/api/profile/fingerprint-settings', authenticateToken, async (req, res) => {
+  try {
+    const { fingerprintEnabled } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (typeof fingerprintEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'fingerprintEnabled must be a boolean value' });
+    }
+
+    // Update user's fingerprint setting
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { fingerprintEnabled },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Fingerprint setting updated successfully',
+      fingerprintEnabled: updatedUser.fingerprintEnabled
+    });
+
+  } catch (error) {
+    console.error('Fingerprint setting update error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -74,6 +74,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  fingerprintEnabled: {
+    type: Boolean,
+    default: false
+  },
   favorites: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product'
