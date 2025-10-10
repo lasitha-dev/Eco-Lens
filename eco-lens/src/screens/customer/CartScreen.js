@@ -3,7 +3,7 @@
  * Shopping cart screen for customer purchases
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,36 +16,177 @@ import {
   Alert,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
+  TextInput,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
 import { useAuth } from '../../hooks/useAuthLogin';
+import { API_BASE_URL } from '../../config/api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const CartScreen = ({ navigation }) => {
-  const { user } = useAuth();
-  // Mock cart data - in a real app this would come from state management
+  const { user, auth: token } = useAuth();
   const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  
+  // Shipping address form - prepopulate with user data
+  const [shippingAddress, setShippingAddress] = useState({
+    fullName: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : '',
+    addressLine1: user?.address || '',
+    addressLine2: '',
+    city: user?.city || '',
+    state: user?.state || '',
+    postalCode: user?.postalCode || user?.zipCode || '',
+    country: user?.country || '',
+    phone: user?.phone || user?.phoneNumber || '',
+  });
 
-  // Function to update item quantity
-  const updateQuantity = (itemId, newQuantity) => {
+  // Fetch cart from API
+  const fetchCart = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/cart`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Transform cart items to match component structure
+        const transformedItems = data.cart.items.map(item => {
+          const productId = item.product._id || item.product.id || item.product;
+          return {
+            id: productId,
+            productId: productId, // Explicitly store product ID for API calls
+            product: item.product,
+            name: item.product.name,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.product.image,
+            category: item.product.category,
+            sustainabilityScore: item.product.sustainabilityScore,
+            sustainabilityGrade: item.product.sustainabilityGrade,
+          };
+        });
+        console.log('Transformed cart items:', transformedItems);
+        setCartItems(transformedItems);
+      } else {
+        console.error('Failed to fetch cart:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+      Alert.alert('Error', 'Failed to load cart. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCart();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCart();
+  }, []);
+
+  // Function to update item quantity with optimistic updates
+  const updateQuantity = async (itemId, newQuantity) => {
     if (newQuantity <= 0) {
       removeItem(itemId);
       return;
     }
-    
+
+    console.log('Updating quantity:', { itemId, newQuantity });
+
+    // Store previous state for rollback
+    const previousCartItems = [...cartItems];
+
+    // Optimistic update - update UI immediately
     setCartItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, quantity: newQuantity } : item
       )
     );
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/cart/update`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId: itemId,
+          quantity: newQuantity,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Update response:', data);
+
+      if (!data.success) {
+        // Rollback on failure
+        console.error('Update failed:', data);
+        setCartItems(previousCartItems);
+        Alert.alert('Error', data.error || 'Failed to update quantity');
+      }
+      // Success - no need to refetch, UI already updated
+    } catch (error) {
+      // Rollback on error
+      console.error('Error updating quantity:', error);
+      setCartItems(previousCartItems);
+      Alert.alert('Error', 'Failed to update cart. Please try again.');
+    }
   };
 
-  // Function to remove item from cart
-  const removeItem = (itemId) => {
+  // Function to remove item from cart with optimistic updates
+  const removeItem = async (itemId) => {
+    console.log('Removing item:', itemId);
+    
+    // Store previous state for rollback
+    const previousCartItems = [...cartItems];
+
+    // Optimistic update - remove item immediately from UI
     setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/cart/remove/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Remove response:', data);
+
+      if (!data.success) {
+        // Rollback on failure
+        console.error('Remove failed:', data);
+        setCartItems(previousCartItems);
+        Alert.alert('Error', data.error || 'Failed to remove item');
+      }
+      // Success - no need to refetch, UI already updated
+    } catch (error) {
+      // Rollback on error
+      console.error('Error removing item:', error);
+      setCartItems(previousCartItems);
+      Alert.alert('Error', 'Failed to remove item. Please try again.');
+    }
   };
 
   // Calculate total price
@@ -72,12 +213,50 @@ const CartScreen = ({ navigation }) => {
       return;
     }
     
-    Alert.alert(
-      'Checkout',
-      'This feature is not implemented yet. In a full app, this would proceed to payment.',
-      [{ text: 'OK' }]
-    );
+    setCheckoutModalVisible(true);
   };
+
+  // Proceed to payment details
+  const proceedToPayment = () => {
+    if (!validateShippingAddress()) {
+      return;
+    }
+
+    setCheckoutModalVisible(false);
+    
+    // Navigate to payment details screen
+    navigation.navigate('PaymentDetails', {
+      shippingAddress,
+      cartItems,
+      totalAmount: calculateTotal(),
+    });
+  };
+
+  // Validate shipping address
+  const validateShippingAddress = () => {
+    if (!shippingAddress.fullName.trim()) {
+      Alert.alert('Error', 'Please enter your full name');
+      return false;
+    }
+    if (!shippingAddress.addressLine1.trim()) {
+      Alert.alert('Error', 'Please enter your address');
+      return false;
+    }
+    if (!shippingAddress.city.trim()) {
+      Alert.alert('Error', 'Please enter your city');
+      return false;
+    }
+    if (!shippingAddress.postalCode.trim()) {
+      Alert.alert('Error', 'Please enter your postal code');
+      return false;
+    }
+    if (!shippingAddress.country.trim()) {
+      Alert.alert('Error', 'Please enter your country');
+      return false;
+    }
+    return true;
+  };
+
 
   // Render cart item
   const renderCartItem = ({ item }) => (
@@ -149,6 +328,18 @@ const CartScreen = ({ navigation }) => {
   const totalAmount = calculateTotal();
   const ecoScore = calculateEcoScore();
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading cart...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar 
@@ -195,6 +386,14 @@ const CartScreen = ({ navigation }) => {
             keyExtractor={(item) => `${item.id}-${item.quantity}`}
             contentContainerStyle={styles.cartList}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+                tintColor={theme.colors.primary}
+              />
+            }
           />
 
           {/* Cart Summary */}
@@ -233,6 +432,95 @@ const CartScreen = ({ navigation }) => {
           </View>
         </>
       )}
+
+      {/* Checkout Modal */}
+      <Modal
+        visible={checkoutModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCheckoutModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Shipping Address</Text>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Full Name *"
+                value={shippingAddress.fullName}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, fullName: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Address Line 1 *"
+                value={shippingAddress.addressLine1}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, addressLine1: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Address Line 2 (Optional)"
+                value={shippingAddress.addressLine2}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, addressLine2: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="City *"
+                value={shippingAddress.city}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, city: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="State/Province"
+                value={shippingAddress.state}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, state: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Postal Code *"
+                value={shippingAddress.postalCode}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, postalCode: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Country *"
+                value={shippingAddress.country}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, country: text })}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                value={shippingAddress.phone}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, phone: text })}
+                keyboardType="phone-pad"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setCheckoutModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={proceedToPayment}
+                >
+                  <Text style={styles.confirmButtonText}>Continue to Payment</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -245,9 +533,9 @@ const styles = StyleSheet.create({
   
   header: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xxxl,
-    paddingBottom: theme.spacing.l,
-    paddingHorizontal: theme.spacing.m,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl : theme.spacing.xxxl,
+    paddingBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.l,
     marginBottom: theme.spacing.s,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
@@ -259,43 +547,44 @@ const styles = StyleSheet.create({
   
   headerContent: {
     flex: 1,
-    marginRight: theme.spacing.m, // Add spacing to match CustomerDashboard
+    marginRight: theme.spacing.m,
   },
 
   profileIcon: {
-    padding: theme.spacing.s,
+    padding: theme.spacing.xs,
   },
 
   profileCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primaryLight,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...theme.shadows.small,
   },
 
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 22,
   },
 
   profileText: {
-    fontSize: theme.typography.fontSize.h5,
+    fontSize: 20,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textOnPrimary,
   },
   
   title: {
-    fontSize: theme.typography.fontSize.h2,
+    fontSize: 26,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 2,
   },
   
   subtitle: {
-    fontSize: theme.typography.fontSize.body2,
+    fontSize: 13,
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
   },
@@ -414,6 +703,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     padding: theme.spacing.l,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 90, // Extra padding for tab bar
     ...theme.shadows.medium,
   },
   
@@ -511,6 +801,88 @@ const styles = StyleSheet.create({
   },
   
   browseButtonText: {
+    color: theme.colors.textOnPrimary,
+    fontSize: theme.typography.fontSize.body1,
+    fontWeight: theme.typography.fontWeight.bold,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: theme.spacing.m,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.textSecondary,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+
+  modalContent: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    padding: theme.spacing.l,
+    maxHeight: '85%',
+  },
+
+  modalTitle: {
+    fontSize: theme.typography.fontSize.h4,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.l,
+    textAlign: 'center',
+  },
+
+  input: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.m,
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.text,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.m,
+    marginTop: theme.spacing.l,
+  },
+
+  modalButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  cancelButton: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  cancelButtonText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.typography.fontSize.body1,
+    fontWeight: theme.typography.fontWeight.semiBold,
+  },
+
+  confirmButton: {
+    backgroundColor: theme.colors.primary,
+    ...theme.shadows.medium,
+  },
+
+  confirmButtonText: {
     color: theme.colors.textOnPrimary,
     fontSize: theme.typography.fontSize.body1,
     fontWeight: theme.typography.fontWeight.bold,

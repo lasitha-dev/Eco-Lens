@@ -15,6 +15,11 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import OnboardingSurvey from '../screens/OnboardingSurvey';
+import GoogleAuthCallbackScreen from '../screens/GoogleAuthCallbackScreen';
+import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
+import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
+import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
+import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +57,10 @@ const AppNavigator = () => {
             {/* Onboarding Survey */}
              <Stack.Screen name="OnboardingSurvey" component={OnboardingSurvey} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
+            <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+            <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} />
+            <Stack.Screen name="PaymentReview" component={PaymentReviewScreen} />
           </>
         )
       ) : (
@@ -62,6 +71,7 @@ const AppNavigator = () => {
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen name="GoogleAuthCallback" component={GoogleAuthCallbackScreen} />
         </>
       )}
     </Stack.Navigator>
