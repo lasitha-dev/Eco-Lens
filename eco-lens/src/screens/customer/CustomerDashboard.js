@@ -35,6 +35,7 @@ import DynamicRecommendationService from '../../api/dynamicRecommendationService
 import CartService from '../../api/cartService';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import GoalProgressCard from '../../components/goals/GoalProgressCard';
+import GoalIndicatorLegend from '../../components/goals/GoalIndicatorLegend';
 import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
@@ -84,6 +85,9 @@ const CustomerDashboard = ({ navigation }) => {
   // Cart toast state
   const [showCartToast, setShowCartToast] = useState(false);
   const [cartToastMessage, setCartToastMessage] = useState('');
+
+  // Goal indicator legend state
+  const [showGoalLegend, setShowGoalLegend] = useState(false);
 
   // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
@@ -456,7 +460,17 @@ const CustomerDashboard = ({ navigation }) => {
       <View style={styles.goalsContainer}>
         <View style={styles.goalsHeaderRow}>
           <View style={styles.goalsHeaderLeft}>
-            <Text style={styles.goalsTitle}>🎯 Your Sustainability Goals</Text>
+            <View style={styles.goalsTitleRow}>
+              <Text style={styles.goalsTitle}>🎯 Your Sustainability Goals</Text>
+              {hasActiveGoals && (
+                <TouchableOpacity 
+                  style={styles.goalHelpButton}
+                  onPress={() => setShowGoalLegend(true)}
+                >
+                  <Ionicons name="help-circle-outline" size={16} color={theme.colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
             {goalStats && (
               <Text style={styles.goalsSubtitle}>
                 {goalStats.activeGoals} active • {goalStats.achievedGoals} achieved
@@ -904,6 +918,12 @@ const CustomerDashboard = ({ navigation }) => {
         }}
         onHide={() => setShowCartToast(false)}
       />
+
+      {/* Goal Indicator Legend Modal */}
+      <GoalIndicatorLegend
+        visible={showGoalLegend}
+        onClose={() => setShowGoalLegend(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -1332,6 +1352,14 @@ const styles = StyleSheet.create({
   },
   goalsHeaderLeft: {
     flex: 1,
+  },
+  goalsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalHelpButton: {
+    marginLeft: theme.spacing.xs,
+    padding: 2,
   },
   goalsTitle: {
     fontSize: theme.typography.fontSize.h6,

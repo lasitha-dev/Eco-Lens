@@ -15,6 +15,8 @@ import {
 import EcoGradeBadge from './EcoGradeBadge';
 import FavoriteIcon from '../FavoriteIcon';
 import { GoalCriteriaChipList } from '../goals/GoalCriteriaChip';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -44,9 +46,70 @@ const ProductCard = memo(({
   // Determine if it's an eco-friendly product (A or B grade)
   const isEcoFriendly = ['A', 'B'].includes(sustainabilityGrade);
 
+  // Calculate goal alignment for visual indicators
+  const goalAlignment = activeGoals.length > 0 
+    ? SustainabilityGoalService.checkProductMeetsGoals(product, activeGoals)
+    : { meetsAnyGoal: false, matchingGoals: [], alignmentPercentage: 0 };
+
+  // Get goal indicator styling
+  const getGoalIndicatorStyle = () => {
+    if (!activeGoals.length) return null;
+    
+    const { meetsAnyGoal, alignmentPercentage } = goalAlignment;
+    
+    if (alignmentPercentage === 100) {
+      return {
+        borderColor: theme.colors.success,
+        borderWidth: 2,
+        backgroundColor: theme.colors.success + '08',
+        indicator: 'perfect-match'
+      };
+    } else if (meetsAnyGoal) {
+      return {
+        borderColor: theme.colors.success,
+        borderWidth: 1,
+        backgroundColor: theme.colors.success + '05',
+        indicator: 'partial-match'
+      };
+    } else {
+      return {
+        borderColor: theme.colors.border,
+        borderWidth: 1,
+        backgroundColor: theme.colors.background,
+        indicator: 'no-match'
+      };
+    }
+  };
+
+  // Get goal alignment icon
+  const getGoalAlignmentIcon = () => {
+    if (!activeGoals.length) return null;
+    
+    const { alignmentPercentage } = goalAlignment;
+    
+    if (alignmentPercentage === 100) {
+      return { name: 'checkmark-circle', color: theme.colors.success, size: 16 };
+    } else if (alignmentPercentage > 0) {
+      return { name: 'checkmark-circle-outline', color: theme.colors.success, size: 16 };
+    } else {
+      return { name: 'close-circle-outline', color: theme.colors.textSecondary, size: 16 };
+    }
+  };
+
+  const goalIndicatorStyle = getGoalIndicatorStyle();
+  const goalAlignmentIcon = getGoalAlignmentIcon();
+
   const renderGridView = () => (
     <TouchableOpacity
-      style={[styles.gridCard, style]}
+      style={[
+        styles.gridCard, 
+        goalIndicatorStyle ? {
+          borderColor: goalIndicatorStyle.borderColor,
+          borderWidth: goalIndicatorStyle.borderWidth,
+          backgroundColor: goalIndicatorStyle.backgroundColor,
+        } : {},
+        style
+      ]}
       onPress={() => onPress(product)}
       activeOpacity={0.7}
     >
@@ -65,10 +128,27 @@ const ProductCard = memo(({
         <View style={styles.badgePosition}>
           <EcoGradeBadge grade={sustainabilityGrade} size="small" />
         </View>
+        {/* Goal Alignment Indicator */}
+        {goalAlignmentIcon && (
+          <View style={styles.goalAlignmentBadge}>
+            <Ionicons 
+              name={goalAlignmentIcon.name} 
+              size={goalAlignmentIcon.size} 
+              color={goalAlignmentIcon.color} 
+            />
+          </View>
+        )}
         {/* Eco-friendly indicator positioned on image */}
         {isEcoFriendly && (
           <View style={styles.ecoIndicator}>
             <Text style={styles.ecoIndicatorText}>ECO</Text>
+          </View>
+        )}
+        {/* Perfect Goal Match Badge */}
+        {goalIndicatorStyle?.indicator === 'perfect-match' && (
+          <View style={styles.perfectMatchBadge}>
+            <Ionicons name="star" size={12} color="#FFD700" />
+            <Text style={styles.perfectMatchText}>Goals</Text>
           </View>
         )}
       </View>
@@ -116,16 +196,42 @@ const ProductCard = memo(({
 
   const renderListView = () => (
     <TouchableOpacity
-      style={[styles.listCard, style]}
+      style={[
+        styles.listCard, 
+        goalIndicatorStyle ? {
+          borderColor: goalIndicatorStyle.borderColor,
+          borderWidth: goalIndicatorStyle.borderWidth,
+          backgroundColor: goalIndicatorStyle.backgroundColor,
+        } : {},
+        style
+      ]}
       onPress={() => onPress(product)}
       activeOpacity={0.7}
     >
       {/* Product Image */}
-      <Image 
-        source={{ uri: image }} 
-        style={styles.listImage}
-        resizeMode="cover"
-      />
+      <View style={styles.listImageContainer}>
+        <Image 
+          source={{ uri: image }} 
+          style={styles.listImage}
+          resizeMode="cover"
+        />
+        {/* Goal Alignment Corner Badge */}
+        {goalAlignmentIcon && (
+          <View style={styles.listGoalAlignmentBadge}>
+            <Ionicons 
+              name={goalAlignmentIcon.name} 
+              size={goalAlignmentIcon.size} 
+              color={goalAlignmentIcon.color} 
+            />
+          </View>
+        )}
+        {/* Perfect Goal Match Corner Badge */}
+        {goalIndicatorStyle?.indicator === 'perfect-match' && (
+          <View style={styles.listPerfectMatchBadge}>
+            <Ionicons name="star" size={10} color="#FFD700" />
+          </View>
+        )}
+      </View>
       
       {/* Product Info */}
       <View style={styles.listInfo}>
@@ -377,6 +483,71 @@ const styles = StyleSheet.create({
 
   goalChipsList: {
     flexWrap: 'wrap',
+  },
+
+  // Goal Indicator Styles
+  goalAlignmentBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.small,
+  },
+
+  perfectMatchBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: '#FFD700',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+
+  perfectMatchText: {
+    fontSize: 8,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: '#333',
+    marginLeft: 2,
+  },
+
+  // List view goal indicator styles
+  listImageContainer: {
+    position: 'relative',
+  },
+
+  listGoalAlignmentBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: theme.colors.background,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.small,
+  },
+
+  listPerfectMatchBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: '#FFD700',
+    borderRadius: 6,
+    width: 12,
+    height: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.small,
   },
 });
 
