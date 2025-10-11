@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import EcoGradeBadge from './EcoGradeBadge';
 import FavoriteIcon from '../FavoriteIcon';
+import { GoalCriteriaChipList } from '../goals/GoalCriteriaChip';
 import theme from '../../styles/theme';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -23,6 +24,9 @@ const ProductCard = memo(({
   product, 
   onPress, 
   isListView = false,
+  activeGoals = [],
+  onGoalPress,
+  showGoalChips = true,
   style 
 }) => {
   const {
@@ -92,6 +96,20 @@ const ProductCard = memo(({
             <Text style={styles.scoreValue}>{sustainabilityScore}%</Text>
           </View>
         </View>
+
+        {/* Goal Criteria Chips */}
+        {showGoalChips && activeGoals.length > 0 && (
+          <View style={styles.goalChipsContainer}>
+            <GoalCriteriaChipList
+              goals={activeGoals}
+              product={product}
+              maxVisible={2}
+              size="small"
+              onGoalPress={onGoalPress}
+              style={styles.goalChipsList}
+            />
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -146,6 +164,20 @@ const ProductCard = memo(({
             </Text>
           </View>
         </View>
+
+        {/* Goal Criteria Chips */}
+        {showGoalChips && activeGoals.length > 0 && (
+          <View style={styles.goalChipsContainer}>
+            <GoalCriteriaChipList
+              goals={activeGoals}
+              product={product}
+              maxVisible={3}
+              size="small"
+              onGoalPress={onGoalPress}
+              style={styles.goalChipsList}
+            />
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -333,6 +365,18 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.caption,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
+  },
+
+  // Goal Chips Styles
+  goalChipsContainer: {
+    marginTop: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border + '50',
+  },
+
+  goalChipsList: {
+    flexWrap: 'wrap',
   },
 });
 

@@ -879,6 +879,9 @@ const CustomerDashboard = ({ navigation }) => {
             product={item}
             onPress={handleProductPress}
             isListView={isListView}
+            activeGoals={activeGoals}
+            onGoalPress={(goal) => navigation.navigate('GoalProgress', { goal })}
+            showGoalChips={activeGoals.length > 0}
           />
         )}
         keyExtractor={(item) => item.id}
