@@ -1,9 +1,10 @@
 /**
  * ProductCard Component
  * Displays product information in a card format with eco-grade
+ * Enhanced with memoization for optimal performance
  */
 
-import React, { memo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import EcoGradeBadge from './EcoGradeBadge';
 import FavoriteIcon from '../FavoriteIcon';
 import { GoalCriteriaChipList } from '../goals/GoalCriteriaChip';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import memoizedGoalService from '../../api/memoizedSustainabilityGoalService';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 
@@ -43,16 +45,24 @@ const ProductCard = memo(({
     seller,
   } = product;
 
-  // Determine if it's an eco-friendly product (A or B grade)
-  const isEcoFriendly = ['A', 'B'].includes(sustainabilityGrade);
+  // Memoized calculations for performance
+  const isEcoFriendly = useMemo(() => 
+    ['A', 'B'].includes(sustainabilityGrade), 
+    [sustainabilityGrade]
+  );
 
-  // Calculate goal alignment for visual indicators
-  const goalAlignment = activeGoals.length > 0 
-    ? SustainabilityGoalService.checkProductMeetsGoals(product, activeGoals)
-    : { meetsAnyGoal: false, matchingGoals: [], alignmentPercentage: 0 };
+  // Memoized goal alignment calculation with service caching
+  const goalAlignment = useMemo(() => {
+    if (activeGoals.length === 0) {
+      return { meetsAnyGoal: false, matchingGoals: [], alignmentPercentage: 0 };
+    }
+    
+    // Use memoized service for better performance
+    return memoizedGoalService.checkProductMeetsGoals(product, activeGoals);
+  }, [product, activeGoals]);
 
-  // Get goal indicator styling
-  const getGoalIndicatorStyle = () => {
+  // Memoized goal indicator styling
+  const goalIndicatorStyle = useMemo(() => {
     if (!activeGoals.length) return null;
     
     const { meetsAnyGoal, alignmentPercentage } = goalAlignment;
@@ -79,10 +89,10 @@ const ProductCard = memo(({
         indicator: 'no-match'
       };
     }
-  };
+  }, [activeGoals.length, goalAlignment]);
 
-  // Get goal alignment icon
-  const getGoalAlignmentIcon = () => {
+  // Memoized goal alignment icon
+  const goalAlignmentIcon = useMemo(() => {
     if (!activeGoals.length) return null;
     
     const { alignmentPercentage } = goalAlignment;
@@ -94,12 +104,36 @@ const ProductCard = memo(({
     } else {
       return { name: 'close-circle-outline', color: theme.colors.textSecondary, size: 16 };
     }
-  };
+  }, [activeGoals.length, goalAlignment]);
 
-  const goalIndicatorStyle = getGoalIndicatorStyle();
-  const goalAlignmentIcon = getGoalAlignmentIcon();
+  // Memoized press handler
+  const handlePress = useCallback(() => {
+    onPress(product);
+  }, [onPress, product]);
 
-  const renderGridView = () => (
+  // Memoized price formatting
+  const formattedPrice = useMemo(() => 
+    `$${price.toFixed(2)}`, 
+    [price]
+  );
+
+  // Memoized rating display
+  const ratingDisplay = useMemo(() => 
+    `⭐ ${rating}`, 
+    [rating]
+  );
+
+  // Memoized eco score color
+  const ecoScoreColor = useMemo(() => {
+    try {
+      return theme.getEcoGradeStyles(sustainabilityGrade).backgroundColor;
+    } catch (error) {
+      return theme.colors.primary;
+    }
+  }, [sustainabilityGrade]);
+
+  // Memoized render methods for better performance
+  const renderGridView = useCallback(() => (
     <TouchableOpacity
       style={[
         styles.gridCard, 
@@ -110,7 +144,7 @@ const ProductCard = memo(({
         } : {},
         style
       ]}
-      onPress={() => onPress(product)}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       {/* Product Image */}
@@ -164,13 +198,13 @@ const ProductCard = memo(({
         
         {/* Rating */}
         <View style={styles.ratingRow}>
-          <Text style={styles.rating}>⭐ {rating}</Text>
+          <Text style={styles.rating}>{ratingDisplay}</Text>
           <Text style={styles.reviewCount}>({reviewCount})</Text>
         </View>
         
         {/* Price and Score */}
         <View style={styles.priceRow}>
-          <Text style={styles.price}>${price.toFixed(2)}</Text>
+          <Text style={styles.price}>{formattedPrice}</Text>
           <View style={styles.scoreContainer}>
             <Text style={styles.scoreLabel}>Eco</Text>
             <Text style={styles.scoreValue}>{sustainabilityScore}%</Text>
@@ -192,9 +226,27 @@ const ProductCard = memo(({
         )}
       </View>
     </TouchableOpacity>
-  );
+  ), [
+    goalIndicatorStyle,
+    style,
+    handlePress,
+    image,
+    product,
+    sustainabilityGrade,
+    goalAlignmentIcon,
+    isEcoFriendly,
+    category,
+    name,
+    ratingDisplay,
+    reviewCount,
+    formattedPrice,
+    sustainabilityScore,
+    showGoalChips,
+    activeGoals,
+    onGoalPress,
+  ]);
 
-  const renderListView = () => (
+  const renderListView = useCallback(() => (
     <TouchableOpacity
       style={[
         styles.listCard, 
@@ -205,7 +257,7 @@ const ProductCard = memo(({
         } : {},
         style
       ]}
-      onPress={() => onPress(product)}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       {/* Product Image */}
@@ -253,18 +305,18 @@ const ProductCard = memo(({
         
         {/* Rating and Reviews */}
         <View style={styles.ratingRow}>
-          <Text style={styles.rating}>⭐ {rating}</Text>
+          <Text style={styles.rating}>{ratingDisplay}</Text>
           <Text style={styles.reviewCount}>({reviewCount} reviews)</Text>
         </View>
         
         {/* Price and Eco Score */}
         <View style={styles.listFooter}>
-          <Text style={styles.price}>${price.toFixed(2)}</Text>
+          <Text style={styles.price}>{formattedPrice}</Text>
           <View style={styles.ecoScoreRow}>
             <Text style={styles.scoreLabel}>Eco Score:</Text>
             <Text style={[
               styles.scoreValue,
-              { color: theme.getEcoGradeStyles(sustainabilityGrade).backgroundColor }
+              { color: ecoScoreColor }
             ]}>
               {sustainabilityScore}%
             </Text>
@@ -286,7 +338,26 @@ const ProductCard = memo(({
         )}
       </View>
     </TouchableOpacity>
-  );
+  ), [
+    goalIndicatorStyle,
+    style,
+    handlePress,
+    image,
+    goalAlignmentIcon,
+    name,
+    product,
+    sustainabilityGrade,
+    category,
+    seller,
+    ratingDisplay,
+    reviewCount,
+    formattedPrice,
+    ecoScoreColor,
+    sustainabilityScore,
+    showGoalChips,
+    activeGoals,
+    onGoalPress,
+  ]);
 
   return isListView ? renderListView() : renderGridView();
 });

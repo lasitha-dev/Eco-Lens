@@ -1,12 +1,15 @@
 /**
  * useRealtimeGoalUpdates Hook
  * Provides real-time goal progress updates with caching and optimization
+ * Enhanced with local storage sync and performance optimizations
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SustainabilityGoalService from '../api/sustainabilityGoalService';
+import GoalStorageManager from '../utils/GoalStorageManager';
+import goalSyncService from '../utils/GoalSyncService';
 import { useAuth } from './useAuthLogin';
 
 const CACHE_KEYS = {
@@ -39,59 +42,55 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   const mountedRef = useRef(true);
 
   /**
-   * Load goals from cache if available and valid
+   * Load goals from cache with enhanced storage manager integration
    */
   const loadFromCache = useCallback(async () => {
     if (!enableCaching) return null;
 
     try {
-      const [cachedGoals, cachedStats, lastUpdateStr] = await Promise.all([
-        AsyncStorage.getItem(CACHE_KEYS.GOALS),
-        AsyncStorage.getItem(CACHE_KEYS.GOALS_STATS),
-        AsyncStorage.getItem(CACHE_KEYS.LAST_UPDATE),
-      ]);
-
-      if (cachedGoals && cachedStats && lastUpdateStr) {
-        const lastUpdateTime = parseInt(lastUpdateStr, 10);
-        const now = Date.now();
+      // Use the enhanced GoalStorageManager for cache operations
+      const cachedData = await GoalStorageManager.getGoals();
+      
+      if (cachedData.cached && !cachedData.expired) {
+        console.log('📋 Loading goals from enhanced cache');
         
-        if (now - lastUpdateTime < CACHE_DURATION) {
-          console.log('📋 Loading goals from cache');
-          return {
-            goals: JSON.parse(cachedGoals),
-            stats: JSON.parse(cachedStats),
-            lastUpdate: lastUpdateTime,
-          };
-        }
+        // Also get stats from cache
+        const statsData = await GoalStorageManager.getGoalStats();
+        
+        return {
+          goals: cachedData.data,
+          stats: statsData?.data || null,
+          lastUpdate: cachedData.timestamp,
+          fromServer: cachedData.fromServer,
+        };
       }
     } catch (error) {
-      console.warn('Failed to load goals from cache:', error);
+      console.warn('Failed to load goals from enhanced cache:', error);
     }
     
     return null;
   }, [enableCaching]);
 
   /**
-   * Save goals to cache
+   * Save goals to cache using enhanced storage manager
    */
   const saveToCache = useCallback(async (goalsData, statsData) => {
     if (!enableCaching) return;
 
     try {
-      const now = Date.now();
+      // Use GoalStorageManager for enhanced caching
       await Promise.all([
-        AsyncStorage.setItem(CACHE_KEYS.GOALS, JSON.stringify(goalsData)),
-        AsyncStorage.setItem(CACHE_KEYS.GOALS_STATS, JSON.stringify(statsData)),
-        AsyncStorage.setItem(CACHE_KEYS.LAST_UPDATE, now.toString()),
+        GoalStorageManager.storeGoals(goalsData, true), // Mark as from server
+        GoalStorageManager.storeGoalStats(statsData),
       ]);
-      console.log('💾 Goals saved to cache');
+      console.log('💾 Goals saved to enhanced cache');
     } catch (error) {
-      console.warn('Failed to save goals to cache:', error);
+      console.warn('Failed to save goals to enhanced cache:', error);
     }
   }, [enableCaching]);
 
   /**
-   * Fetch goals from API with optimistic updates
+   * Fetch goals from API with optimistic updates and enhanced sync integration
    */
   const fetchGoals = useCallback(async (useCache = true) => {
     if (!token || isUpdatingRef.current) return;
@@ -107,13 +106,28 @@ export const useRealtimeGoalUpdates = (options = {}) => {
           setGoals(cached.goals);
           setGoalStats(cached.stats);
           setLastUpdate(cached.lastUpdate);
-          console.log('⚡ Goals loaded from cache, fetching fresh data in background');
+          console.log('⚡ Goals loaded from enhanced cache, fetching fresh data in background');
         }
       }
 
       setLoading(!useCache || !goals.length); // Don't show loading if we have cached data
 
-      // Fetch fresh data
+      // Check if we should prefer local data (if syncing is in progress or offline)
+      const syncStatus = goalSyncService.getSyncStatus();
+      if (!syncStatus.isOnline) {
+        console.log('📱 Offline mode - loading from local storage only');
+        const localData = await GoalStorageManager.getGoals(false);
+        if (localData.cached && mountedRef.current) {
+          setGoals(localData.data);
+          const statsData = await GoalStorageManager.getGoalStats();
+          setGoalStats(statsData?.data || null);
+          setLastUpdate(localData.timestamp);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Fetch fresh data from server with memoized service calls
       const [freshGoals, freshStats] = await Promise.all([
         SustainabilityGoalService.getUserGoals(token),
         SustainabilityGoalService.getGoalStats(token),
@@ -121,7 +135,12 @@ export const useRealtimeGoalUpdates = (options = {}) => {
 
       if (!mountedRef.current) return;
 
-      // Check for newly achieved goals
+      // Memoized goal comparison for performance
+      const previousGoalMap = useMemo(() => new Map(
+        goals.map(g => [g._id, g])
+      ), [goals]);
+
+      // Check for newly achieved goals - optimized comparison
       if (goals.length > 0 && onGoalAchieved) {
         const previouslyAchieved = new Set(
           goals.filter(g => g.isAchieved).map(g => g._id)
@@ -136,11 +155,11 @@ export const useRealtimeGoalUpdates = (options = {}) => {
         });
       }
 
-      // Check for progress updates
+      // Check for progress updates - memoized for performance
       if (goals.length > 0 && onProgressUpdate) {
         const progressUpdates = freshGoals
           .map(freshGoal => {
-            const oldGoal = goals.find(g => g._id === freshGoal._id);
+            const oldGoal = previousGoalMap.get(freshGoal._id);
             if (oldGoal && oldGoal.progress?.currentPercentage !== freshGoal.progress?.currentPercentage) {
               return {
                 goal: freshGoal,
@@ -163,7 +182,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       setLastUpdate(Date.now());
       setLoading(false);
 
-      // Save to cache
+      // Save to enhanced cache
       await saveToCache(freshGoals, freshStats);
 
       console.log(`📊 Goals updated: ${freshGoals.length} goals, ${freshStats?.activeGoals || 0} active`);
@@ -173,6 +192,15 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       if (mountedRef.current) {
         setError(err.message);
         setLoading(false);
+        
+        // Try to load from local storage as fallback
+        const localData = await GoalStorageManager.getGoals(false);
+        if (localData.cached) {
+          console.log('📱 Loading fallback data from local storage');
+          setGoals(localData.data);
+          const statsData = await GoalStorageManager.getGoalStats();
+          setGoalStats(statsData?.data || null);
+        }
       }
     } finally {
       isUpdatingRef.current = false;
@@ -247,22 +275,21 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   }, [goals, refreshGoals]);
 
   /**
-   * Get active goals only
+   * Get active goals only - memoized for performance
    */
-  const activeGoals = goals.filter(goal => goal.isActive);
+  const activeGoals = useMemo(() => goals.filter(goal => goal.isActive), [goals]);
 
   /**
-   * Get achieved goals only
+   * Get achieved goals only - memoized for performance
    */
-  const achievedGoals = goals.filter(goal => goal.isAchieved);
+  const achievedGoals = useMemo(() => goals.filter(goal => goal.isAchieved), [goals]);
 
   /**
-   * Check if any goals are close to achievement (>80% progress)
+   * Check if any goals are close to achievement (>80% progress) - memoized
    */
-  const goalsNearCompletion = goals.filter(goal => 
-    !goal.isAchieved && 
-    goal.progress?.currentPercentage >= 80
-  );
+  const goalsNearCompletion = useMemo(() => goals.filter(goal => 
+    !goal.isAchieved && goal.progress?.currentPercentage >= 80
+  ), [goals]);
 
   // Setup auto-refresh interval
   useEffect(() => {
@@ -308,7 +335,8 @@ export const useRealtimeGoalUpdates = (options = {}) => {
     };
   }, []);
 
-  return {
+  // Memoized return value for performance optimization
+  return useMemo(() => ({
     // Data
     goals,
     activeGoals,
@@ -327,7 +355,26 @@ export const useRealtimeGoalUpdates = (options = {}) => {
     
     // Utils
     isUpdating: isUpdatingRef.current,
-  };
+    
+    // Sync integration
+    syncStatus: goalSyncService.getSyncStatus(),
+    isOnline: goalSyncService.getSyncStatus().isOnline,
+    hasOfflineChanges: false, // Will be populated by context
+    
+    // Performance metrics
+    cacheHitRatio: goals.length > 0 ? 1 : 0, // Placeholder for cache metrics
+  }), [
+    goals,
+    activeGoals,
+    achievedGoals,
+    goalsNearCompletion,
+    goalStats,
+    loading,
+    error,
+    lastUpdate,
+    refreshGoals,
+    trackPurchaseProgress,
+  ]);
 };
 
 export default useRealtimeGoalUpdates;
