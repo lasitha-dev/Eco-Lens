@@ -34,6 +34,7 @@ import EnhancedRecommendationService from '../../api/enhancedRecommendationServi
 import DynamicRecommendationService from '../../api/dynamicRecommendationService';
 import CartService from '../../api/cartService';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import GoalProgressCard from '../../components/goals/GoalProgressCard';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
 import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
@@ -511,66 +512,13 @@ const CustomerDashboard = ({ navigation }) => {
             contentContainerStyle={styles.goalsScrollContent}
           >
             {activeGoals.map((goal) => (
-              <TouchableOpacity
+              <GoalProgressCard
                 key={goal._id}
-                style={styles.goalCard}
+                goal={goal}
+                size="medium"
                 onPress={() => navigation.navigate('GoalProgress', { goal })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.goalCardHeader}>
-                  <Text style={styles.goalCardTitle} numberOfLines={2}>
-                    {goal.title}
-                  </Text>
-                  <View style={[
-                    styles.goalTypeIndicator,
-                    { backgroundColor: getGoalTypeColor(goal.goalType) }
-                  ]}>
-                    <Text style={styles.goalTypeText}>
-                      {getGoalTypeLabel(goal.goalType)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.goalProgressContainer}>
-                  <View style={styles.goalProgressBarBackground}>
-                    <View 
-                      style={[
-                        styles.goalProgressBarFill,
-                        { 
-                          width: `${Math.min(goal.progress.currentPercentage / goal.goalConfig.percentage * 100, 100)}%`,
-                          backgroundColor: SustainabilityGoalService.getGoalProgressColor(
-                            goal.progress.currentPercentage,
-                            goal.goalConfig.percentage
-                          )
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={styles.goalProgressText}>
-                    {goal.progress.currentPercentage}% of {goal.goalConfig.percentage}%
-                  </Text>
-                </View>
-
-                <View style={styles.goalCardFooter}>
-                  <Text style={styles.goalStatsText}>
-                    {goal.progress.goalMetPurchases}/{goal.progress.totalPurchases} purchases
-                  </Text>
-                  <Text style={[
-                    styles.goalStatusText,
-                    { 
-                      color: SustainabilityGoalService.getGoalProgressColor(
-                        goal.progress.currentPercentage,
-                        goal.goalConfig.percentage
-                      )
-                    }
-                  ]}>
-                    {SustainabilityGoalService.getGoalProgressStatus(
-                      goal.progress.currentPercentage,
-                      goal.goalConfig.percentage
-                    )}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                style={styles.goalCardSpacing}
+              />
             ))}
 
             {/* Add new goal card */}
@@ -1457,6 +1405,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.borderLight,
     ...theme.shadows.small,
+  },
+  
+  goalCardSpacing: {
+    marginRight: theme.spacing.m,
   },
   goalCardHeader: {
     marginBottom: theme.spacing.s,
