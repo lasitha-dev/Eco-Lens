@@ -4,7 +4,71 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const SustainabilityGoal = require('../models/SustainabilityGoal');
 const { authenticateToken } = require('../middleware/auth');
+
+// Helper function to track purchase against sustainability goals
+const trackPurchaseForGoals = async (userId, orderId) => {
+  try {
+    console.log(`🎯 Tracking purchase for sustainability goals - User: ${userId}, Order: ${orderId}`);
+    
+    // Get all active goals for the user
+    const activeGoals = await SustainabilityGoal.find({ 
+      userId, 
+      isActive: true 
+    });
+    
+    if (activeGoals.length === 0) {
+      console.log('No active goals found for user');
+      return;
+    }
+    
+    // Get the completed order with product details
+    const order = await Order.findById(orderId).populate('items.product');
+    if (!order) {
+      console.error('Order not found for goal tracking');
+      return;
+    }
+    
+    console.log(`📊 Processing ${order.items.length} items against ${activeGoals.length} goals`);
+    
+    // Get all completed orders for this user to recalculate progress
+    const allCompletedOrders = await Order.find({ 
+      user: userId, 
+      paymentStatus: 'paid' 
+    }).populate('items.product');
+    
+    // Update progress for each active goal
+    for (const goal of activeGoals) {
+      let totalPurchases = 0;
+      let goalMetPurchases = 0;
+      
+      // Calculate progress based on all completed orders
+      allCompletedOrders.forEach(completedOrder => {
+        completedOrder.items.forEach(item => {
+          totalPurchases++;
+          
+          // Check if this item meets the goal criteria
+          const meetsGoal = goal.doesProductMeetGoal(item.product);
+          if (meetsGoal) {
+            goalMetPurchases++;
+          }
+        });
+      });
+      
+      // Update goal progress
+      goal.updateProgress(totalPurchases, goalMetPurchases);
+      await goal.save();
+      
+      console.log(`✅ Updated goal "${goal.title}": ${goalMetPurchases}/${totalPurchases} purchases (${goal.progress.currentPercentage}%)`);
+    }
+    
+    console.log('🎉 Successfully tracked purchase against all active goals');
+  } catch (error) {
+    console.error('❌ Error tracking purchase for goals:', error);
+    // Don't throw error - goal tracking shouldn't fail order completion
+  }
+};
 
 // Helper function to get card brand from number
 const getCardBrand = (cardNumber) => {
@@ -110,6 +174,11 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
     // Clear user's cart
     cart.items = [];
     await cart.save();
+    
+    // Track purchase against sustainability goals (async - don't block response)
+    trackPurchaseForGoals(userId, order._id).catch(error => {
+      console.error('Background goal tracking failed:', error);
+    });
     
     res.json({
       success: true,
@@ -298,6 +367,11 @@ async function handleSuccessfulPayment(session) {
         { user: order.user },
         { items: [] }
       );
+      
+      // Track purchase against sustainability goals (async - don't block)
+      trackPurchaseForGoals(order.user, order._id).catch(error => {
+        console.error('Background goal tracking failed for webhook:', error);
+      });
       
       console.log('Order payment successful:', order.orderNumber);
     }

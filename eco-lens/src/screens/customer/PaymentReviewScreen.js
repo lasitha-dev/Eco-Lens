@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
 
 const PaymentReviewScreen = ({ route, navigation }) => {
@@ -32,6 +33,108 @@ const PaymentReviewScreen = ({ route, navigation }) => {
   const maskCardNumber = (cardNumber) => {
     const cleaned = cardNumber.replace(/\s/g, '');
     return `•••• •••• •••• ${cleaned.slice(-4)}`;
+  };
+
+  // Show payment success with sustainability goal updates
+  const showPaymentSuccessWithGoals = async (order) => {
+    try {
+      // Give backend a moment to process goal tracking
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Check goal progress updates
+      const goalStats = await SustainabilityGoalService.getGoalStats();
+      const activeGoals = await SustainabilityGoalService.getUserGoals();
+      
+      // Check how many cart items met goals
+      const goalValidation = SustainabilityGoalService.checkProductMeetsGoals(cartItems, activeGoals);
+      const itemsMeetingGoals = goalValidation.filter(item => item.meetsAnyGoal).length;
+      
+      let successMessage = `Your order ${order.orderNumber} has been placed successfully! 🎉`;
+      
+      // Add goal progress message if user has active goals
+      if (activeGoals.length > 0) {
+        if (itemsMeetingGoals === cartItems.length) {
+          successMessage += `\n\n🌟 Amazing! All ${cartItems.length} items meet your sustainability goals!`;
+        } else if (itemsMeetingGoals > 0) {
+          successMessage += `\n\n🎯 Great job! ${itemsMeetingGoals} out of ${cartItems.length} items meet your sustainability goals.`;
+        } else {
+          successMessage += `\n\n💚 Your purchase has been tracked against your sustainability goals.`;
+        }
+        
+        // Check for any newly achieved goals
+        const achievedGoals = activeGoals.filter(goal => goal.isAchieved);
+        if (achievedGoals.length > 0) {
+          successMessage += `\n\n🏆 Goal Achievement! You've successfully completed ${achievedGoals.length} sustainability goal${achievedGoals.length > 1 ? 's' : ''}!`;
+        }
+      }
+      
+      Alert.alert('Order Confirmed! 🎉', successMessage, [
+        {
+          text: 'View Goals Progress',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Dashboard' },
+                { name: 'SustainabilityGoals' }
+              ],
+            });
+          },
+        },
+        {
+          text: 'View Order',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Dashboard' },
+                { name: 'OrderDetails', params: { orderId: order._id } }
+              ],
+            });
+          },
+        },
+        {
+          text: 'Continue Shopping',
+          style: 'cancel',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error('Error showing enhanced success message:', error);
+      // Fallback to basic success message
+      Alert.alert(
+        'Payment Successful! 🎉',
+        `Your order ${order.orderNumber} has been placed successfully.`,
+        [
+          {
+            text: 'View Order',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [
+                  { name: 'Dashboard' },
+                  { name: 'OrderDetails', params: { orderId: order._id } }
+                ],
+              });
+            },
+          },
+          {
+            text: 'Continue Shopping',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            },
+          },
+        ]
+      );
+    }
   };
 
   // Process payment
@@ -60,34 +163,8 @@ const PaymentReviewScreen = ({ route, navigation }) => {
       const data = await response.json();
 
       if (data.success) {
-        // Payment successful
-        Alert.alert(
-          'Payment Successful! 🎉',
-          `Your order ${data.order.orderNumber} has been placed successfully.`,
-          [
-            {
-              text: 'View Order',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [
-                    { name: 'Dashboard' },
-                    { name: 'OrderDetails', params: { orderId: data.order._id } }
-                  ],
-                });
-              },
-            },
-            {
-              text: 'Continue Shopping',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Dashboard' }],
-                });
-              },
-            },
-          ]
-        );
+        // Payment successful - show enhanced success message with goal tracking
+        await showPaymentSuccessWithGoals(data.order);
       } else {
         Alert.alert('Payment Failed', data.error || 'Failed to process payment. Please try again.');
       }
