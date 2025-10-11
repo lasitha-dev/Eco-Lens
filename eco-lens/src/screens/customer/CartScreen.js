@@ -25,6 +25,7 @@ import {
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
 
@@ -36,6 +37,10 @@ const CartScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  
+  // Sustainability goals state
+  const [activeGoals, setActiveGoals] = useState([]);
+  const [goalValidation, setGoalValidation] = useState({});
   
   // Shipping address form - prepopulate with user data
   const [shippingAddress, setShippingAddress] = useState({
@@ -93,13 +98,89 @@ const CartScreen = ({ navigation }) => {
     }
   };
 
+  // Load active sustainability goals
+  const loadActiveGoals = async () => {
+    if (!token) return;
+
+    try {
+      const response = await SustainabilityGoalService.getUserGoals(token);
+      if (response.success) {
+        const active = response.goals.filter(goal => goal.isActive);
+        setActiveGoals(active);
+        console.log('✅ Loaded active goals for cart validation:', active.length);
+      }
+    } catch (error) {
+      console.error('Error loading goals for cart:', error);
+    }
+  };
+
+  // Validate cart items against sustainability goals
+  const validateCartAgainstGoals = useCallback(() => {
+    if (activeGoals.length === 0 || cartItems.length === 0) {
+      setGoalValidation({});
+      return;
+    }
+
+    const validation = {};
+    let totalGoalsMet = 0;
+    let totalPossibleMeets = 0;
+
+    cartItems.forEach(item => {
+      const itemValidation = {
+        meetsAnyGoal: false,
+        matchingGoals: [],
+        notMetGoals: []
+      };
+
+      activeGoals.forEach(goal => {
+        const meetsGoal = SustainabilityGoalService.checkProductMeetsGoals(
+          item.product, 
+          [goal]
+        ).meetsAnyGoal;
+
+        if (meetsGoal) {
+          itemValidation.meetsAnyGoal = true;
+          itemValidation.matchingGoals.push(goal);
+          totalGoalsMet++;
+        } else {
+          itemValidation.notMetGoals.push(goal);
+        }
+        totalPossibleMeets++;
+      });
+
+      validation[item.id] = itemValidation;
+    });
+
+    // Calculate overall cart goal compliance
+    const overallCompliance = totalPossibleMeets > 0 
+      ? Math.round((totalGoalsMet / totalPossibleMeets) * 100) 
+      : 0;
+
+    validation._summary = {
+      totalItems: cartItems.length,
+      itemsMeetingAnyGoal: Object.values(validation).filter(v => v.meetsAnyGoal).length,
+      overallCompliance,
+      activeGoalsCount: activeGoals.length
+    };
+
+    setGoalValidation(validation);
+    console.log('📊 Cart goal validation:', validation._summary);
+  }, [cartItems, activeGoals]);
+
+  // Validate cart whenever items or goals change
+  useEffect(() => {
+    validateCartAgainstGoals();
+  }, [validateCartAgainstGoals]);
+
   useEffect(() => {
     fetchCart();
+    loadActiveGoals();
   }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchCart();
+    loadActiveGoals(); // Also refresh goals
   }, []);
 
   // Function to update item quantity with optimistic updates
@@ -259,54 +340,88 @@ const CartScreen = ({ navigation }) => {
 
 
   // Render cart item
-  const renderCartItem = ({ item }) => (
-    <View style={styles.cartItem}>
-      <Image source={{ uri: item.image }} style={styles.itemImage} />
-      
-      <View style={styles.itemDetails}>
-        <View style={styles.itemHeader}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {item.name}
+  const renderCartItem = ({ item }) => {
+    const itemGoalValidation = goalValidation[item.id];
+    
+    return (
+      <View style={styles.cartItem}>
+        <Image source={{ uri: item.image }} style={styles.itemImage} />
+        
+        <View style={styles.itemDetails}>
+          <View style={styles.itemHeader}>
+            <Text style={styles.itemName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={styles.itemBadges}>
+              <EcoGradeBadge grade={item.sustainabilityGrade} size="small" />
+              {itemGoalValidation && (
+                <View style={[
+                  styles.goalIndicator,
+                  { backgroundColor: itemGoalValidation.meetsAnyGoal ? theme.colors.success + '20' : theme.colors.warning + '20' }
+                ]}>
+                  <Text style={[
+                    styles.goalIndicatorText,
+                    { color: itemGoalValidation.meetsAnyGoal ? theme.colors.success : theme.colors.warning }
+                  ]}>
+                    {itemGoalValidation.meetsAnyGoal ? '✓' : '!'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+          
+          <Text style={styles.itemCategory}>{item.category}</Text>
+          <Text style={styles.itemPrice}>${item.price.toFixed(2)} each</Text>
+          
+          {/* Goal Validation Info */}
+          {itemGoalValidation && activeGoals.length > 0 && (
+            <View style={styles.goalValidationContainer}>
+              {itemGoalValidation.meetsAnyGoal ? (
+                <Text style={styles.goalValidationText}>
+                  ✅ Meets {itemGoalValidation.matchingGoals.length} goal{itemGoalValidation.matchingGoals.length !== 1 ? 's' : ''}
+                </Text>
+              ) : (
+                <Text style={styles.goalValidationTextWarning}>
+                  ⚠️ Doesn't meet sustainability goals
+                </Text>
+              )}
+            </View>
+          )}
+          
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => updateQuantity(item.id, item.quantity - 1)}
+            >
+              <Text style={styles.quantityButtonText}>-</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.quantityText}>{item.quantity}</Text>
+            
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => updateQuantity(item.id, item.quantity + 1)}
+            >
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => removeItem(item.id)}
+            >
+              <Text style={styles.removeButtonText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.itemTotal}>
+          <Text style={styles.itemTotalText}>
+            ${(item.price * item.quantity).toFixed(2)}
           </Text>
-          <EcoGradeBadge grade={item.sustainabilityGrade} size="small" />
-        </View>
-        
-        <Text style={styles.itemCategory}>{item.category}</Text>
-        <Text style={styles.itemPrice}>${item.price.toFixed(2)} each</Text>
-        
-        <View style={styles.quantityContainer}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
-          >
-            <Text style={styles.quantityButtonText}>-</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity + 1)}
-          >
-            <Text style={styles.quantityButtonText}>+</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => removeItem(item.id)}
-          >
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </TouchableOpacity>
         </View>
       </View>
-      
-      <View style={styles.itemTotal}>
-        <Text style={styles.itemTotalText}>
-          ${(item.price * item.quantity).toFixed(2)}
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   // Render empty cart
   const renderEmptyCart = () => (
@@ -417,6 +532,30 @@ const CartScreen = ({ navigation }) => {
                 />
               </View>
             </View>
+            
+            {/* Goal Compliance Summary */}
+            {goalValidation._summary && activeGoals.length > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Goal Compliance:</Text>
+                <View style={styles.goalComplianceContainer}>
+                  <Text style={[
+                    styles.summaryValue, 
+                    { 
+                      color: goalValidation._summary.overallCompliance >= 70 
+                        ? theme.colors.success 
+                        : goalValidation._summary.overallCompliance >= 40 
+                          ? theme.colors.warning 
+                          : theme.colors.error 
+                    }
+                  ]}>
+                    {goalValidation._summary.itemsMeetingAnyGoal}/{goalValidation._summary.totalItems} items
+                  </Text>
+                  <Text style={styles.goalCompliancePercent}>
+                    ({Math.round((goalValidation._summary.itemsMeetingAnyGoal / goalValidation._summary.totalItems) * 100)}%)
+                  </Text>
+                </View>
+              </View>
+            )}
             
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total:</Text>
@@ -886,6 +1025,47 @@ const styles = StyleSheet.create({
     color: theme.colors.textOnPrimary,
     fontSize: theme.typography.fontSize.body1,
     fontWeight: theme.typography.fontWeight.bold,
+  },
+
+  // Goal Validation Styles
+  itemBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: theme.spacing.xs,
+  },
+  goalIndicatorText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.bold,
+  },
+  goalValidationContainer: {
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+  },
+  goalValidationText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.success,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  goalValidationTextWarning: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.warning,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  goalComplianceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalCompliancePercent: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.xs,
   },
 });
 
