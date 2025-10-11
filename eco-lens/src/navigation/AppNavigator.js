@@ -20,6 +20,9 @@ import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
 import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
 import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
 import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
+import SustainabilityGoalsScreen from '../screens/customer/SustainabilityGoalsScreen';
+import GoalSetupScreen from '../screens/customer/GoalSetupScreen';
+import GoalProgressScreen from '../screens/customer/GoalProgressScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,6 +64,10 @@ const AppNavigator = () => {
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} />
             <Stack.Screen name="PaymentReview" component={PaymentReviewScreen} />
+            {/* Sustainability Goals Screens */}
+            <Stack.Screen name="SustainabilityGoals" component={SustainabilityGoalsScreen} />
+            <Stack.Screen name="GoalSetup" component={GoalSetupScreen} />
+            <Stack.Screen name="GoalProgress" component={GoalProgressScreen} />
           </>
         )
       ) : (
