@@ -16,6 +16,7 @@ const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
 const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
+const sustainabilityGoalRoutes = require('./routes/sustainabilityGoalRoutes');
 const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
@@ -753,6 +754,9 @@ app.use('/api/search', searchAnalyticsRoutes);
 
 // Dynamic Recommendation Routes
 app.use('/api/dynamic', dynamicRecommendationRoutes);
+
+// Sustainability Goals Routes
+app.use('/api/goals', sustainabilityGoalRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
