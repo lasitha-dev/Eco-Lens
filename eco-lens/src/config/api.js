@@ -20,23 +20,8 @@ const getApiUrl = () => {
     return configUrl;
   }
   
-  // Fallback logic for development
-  if (Platform.OS === 'web') {
-    // Web can use localhost
-    return 'http://localhost:5002/api';
-  } else {
-    // Mobile devices need the computer's IP address
-    // Expo provides this through the debuggerHost
-    const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0];
-    
-    if (debuggerHost) {
-      return `http://${debuggerHost}:5002/api`;
-    }
-    
-    // Final fallback - use detected WiFi IP address
-    console.warn('Could not auto-detect IP address from Expo. Using detected WiFi IP.');
-    return 'http://10.38.245.146:5002/api'; // Your computer's WiFi IP address
-  }
+  // Fallback logic - use production URL
+  return 'https://eco-lens-8bn1.onrender.com/api';
 };
 
 export const API_BASE_URL = getApiUrl();
