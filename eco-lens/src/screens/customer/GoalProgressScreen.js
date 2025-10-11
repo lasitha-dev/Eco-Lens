@@ -21,19 +21,23 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuthLogin';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import AnimatedProgressBar from '../../components/goals/AnimatedProgressBar';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const GoalProgressScreen = ({ route, navigation }) => {
   const { goal: initialGoal } = route.params;
   const { auth } = useAuth();
+  const { triggerCustomAchievement } = useRealtimeGoals();
   
   // State management
   const [goal, setGoal] = useState(initialGoal);
   const [detailedProgress, setDetailedProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [previousProgress, setPreviousProgress] = useState(initialGoal?.progress?.currentPercentage || 0);
   
   // Animation values
   const progressAnimation = React.useRef(new Animated.Value(0)).current;
@@ -60,6 +64,39 @@ const GoalProgressScreen = ({ route, navigation }) => {
   }, [detailedProgress]);
 
   // Fetch detailed goal progress
+  // Handle milestone detection when progress updates
+  const handleMilestoneReached = (milestone) => {
+    console.log(`🎯 Milestone reached: ${milestone}% for goal "${goal.title}"`);
+    
+    // Trigger custom milestone achievement animation
+    if (triggerCustomAchievement) {
+      triggerCustomAchievement('milestone', goal, `You've reached ${milestone}% progress!`);
+    }
+  };
+
+  // Detect if progress has improved and trigger appropriate animations
+  const detectProgressImprovement = (newProgress) => {
+    const currentPercentage = newProgress?.currentPercentage || 0;
+    
+    if (currentPercentage > previousProgress) {
+      const improvement = currentPercentage - previousProgress;
+      
+      // Check for significant improvements (>= 10%)
+      if (improvement >= 10) {
+        setTimeout(() => {
+          triggerCustomAchievement && triggerCustomAchievement(
+            'milestone', 
+            goal, 
+            `Wow! You improved by ${improvement.toFixed(1)}% on this goal!`
+          );
+        }, 1000);
+      }
+      
+      // Update previous progress
+      setPreviousProgress(currentPercentage);
+    }
+  };
+
   const fetchGoalProgress = async () => {
     try {
       const response = await SustainabilityGoalService.getGoalProgress(goal._id, auth);
@@ -67,6 +104,9 @@ const GoalProgressScreen = ({ route, navigation }) => {
       if (response.success) {
         setGoal(response.goal);
         setDetailedProgress(response.detailedProgress);
+        
+        // Detect progress improvement and trigger animations
+        detectProgressImprovement(response.detailedProgress);
       } else {
         Alert.alert('Error', response.error || 'Failed to fetch goal progress');
         navigation.goBack();
@@ -164,42 +204,33 @@ const GoalProgressScreen = ({ route, navigation }) => {
     </View>
   );
 
-  // Render progress circle
+  // Render progress section with animated progress bar
   const renderProgressCircle = () => {
     if (!detailedProgress) return null;
 
-    const progressPercentage = Math.min(
-      detailedProgress.currentPercentage / goal.goalConfig.percentage * 100, 
-      100
-    );
+    const currentProgress = detailedProgress.currentPercentage || 0;
+    const targetProgress = goal.goalConfig.percentage || 100;
+    const progressPercentage = Math.min((currentProgress / targetProgress) * 100, 100);
 
     return (
       <View style={styles.progressSection}>
         <Text style={styles.sectionTitle}>Progress Overview</Text>
         
-        <View style={styles.progressCircleContainer}>
-          <View style={styles.progressCircle}>
-            <Animated.View
-              style={[
-                styles.progressCircleFill,
-                {
-                  transform: [{
-                    rotate: progressAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', `${progressPercentage * 3.6}deg`],
-                    })
-                  }]
-                }
-              ]}
-            />
-            <View style={styles.progressCircleInner}>
-              <Text style={styles.progressPercentage}>
-                {Math.round(progressPercentage)}%
-              </Text>
-              <Text style={styles.progressLabel}>Complete</Text>
-            </View>
-          </View>
+        <View style={styles.progressContainer}>
+          {/* Animated Progress Bar with Milestones */}
+          <AnimatedProgressBar
+            progress={currentProgress}
+            targetProgress={targetProgress}
+            height={12}
+            showMilestones={true}
+            showPercentage={true}
+            color={getProgressColor()}
+            animationDuration={1500}
+            onMilestoneReached={handleMilestoneReached}
+            style={styles.animatedProgressBar}
+          />
           
+          {/* Progress Stats */}
           <View style={styles.progressStats}>
             <View style={styles.progressStat}>
               <Text style={styles.progressStatNumber}>
@@ -224,6 +255,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
           </View>
         </View>
         
+        {/* Progress Status Card */}
         <View style={styles.progressStatusCard}>
           <View style={styles.progressStatusHeader}>
             <Ionicons 
@@ -237,7 +269,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
           </View>
           <Text style={styles.progressStatusDescription}>
             {detailedProgress.isAchieved 
-              ? "Congratulations! You've achieved your sustainability goal!"
+              ? "Congratulations! You've achieved your sustainability goal! 🎉"
               : `You need ${Math.max(0, Math.ceil((goal.goalConfig.percentage - detailedProgress.currentPercentage) / 100 * detailedProgress.totalPurchases))} more goal-meeting purchases to achieve your target.`
             }
           </Text>
@@ -601,49 +633,17 @@ const styles = StyleSheet.create({
 
   // Progress Section Styles
   progressSection: {
-    marginBottom: theme.spacing.l,
-  },
-  progressCircleContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.m,
-  },
-  progressCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: theme.colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.m,
-    position: 'relative',
-  },
-  progressCircleFill: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: theme.colors.primary,
-    transformOrigin: 'center',
-    zIndex: 1,
-  },
-  progressCircleInner: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
     backgroundColor: theme.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.l,
+    ...theme.shadows.card,
   },
-  progressPercentage: {
-    fontSize: theme.typography.fontSize.h2,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text,
+  progressContainer: {
+    marginVertical: theme.spacing.m,
   },
-  progressLabel: {
-    fontSize: theme.typography.fontSize.caption,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
+  animatedProgressBar: {
+    marginBottom: theme.spacing.l,
   },
   progressStats: {
     flexDirection: 'row',
