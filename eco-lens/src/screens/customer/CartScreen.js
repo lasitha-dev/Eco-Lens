@@ -122,59 +122,6 @@ const CartScreen = ({ navigation }) => {
     }
   };
 
-  // Validate cart items against sustainability goals
-  const validateCartAgainstGoals = useCallback(() => {
-    if (activeGoals.length === 0 || cartItems.length === 0) {
-      setGoalValidation({});
-      return;
-    }
-
-    const validation = {};
-    let totalGoalsMet = 0;
-    let totalPossibleMeets = 0;
-
-    cartItems.forEach(item => {
-      const itemValidation = {
-        meetsAnyGoal: false,
-        matchingGoals: [],
-        notMetGoals: []
-      };
-
-      activeGoals.forEach(goal => {
-        const meetsGoal = SustainabilityGoalService.checkProductMeetsGoals(
-          item.product, 
-          [goal]
-        ).meetsAnyGoal;
-
-        if (meetsGoal) {
-          itemValidation.meetsAnyGoal = true;
-          itemValidation.matchingGoals.push(goal);
-          totalGoalsMet++;
-        } else {
-          itemValidation.notMetGoals.push(goal);
-        }
-        totalPossibleMeets++;
-      });
-
-      validation[item.id] = itemValidation;
-    });
-
-    // Calculate overall cart goal compliance
-    const overallCompliance = totalPossibleMeets > 0 
-      ? Math.round((totalGoalsMet / totalPossibleMeets) * 100) 
-      : 0;
-
-    validation._summary = {
-      totalItems: cartItems.length,
-      itemsMeetingAnyGoal: Object.values(validation).filter(v => v.meetsAnyGoal).length,
-      overallCompliance,
-      activeGoalsCount: activeGoals.length
-    };
-
-    setGoalValidation(validation);
-    console.log('📊 Cart goal validation:', validation._summary);
-  }, [cartItems, activeGoals]);
-
   useEffect(() => {
     fetchCart();
     // Goals are now automatically loaded by the RealtimeGoalProvider
