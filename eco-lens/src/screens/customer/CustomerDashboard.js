@@ -21,6 +21,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -32,6 +33,7 @@ import SearchAnalyticsService from '../../api/searchAnalyticsService';
 import EnhancedRecommendationService from '../../api/enhancedRecommendationService';
 import DynamicRecommendationService from '../../api/dynamicRecommendationService';
 import CartService from '../../api/cartService';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
 import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
@@ -70,6 +72,11 @@ const CustomerDashboard = ({ navigation }) => {
   // Cart toast state
   const [showCartToast, setShowCartToast] = useState(false);
   const [cartToastMessage, setCartToastMessage] = useState('');
+
+  // Sustainability goals state
+  const [activeGoals, setActiveGoals] = useState([]);
+  const [goalStats, setGoalStats] = useState(null);
+  const [goalsLoading, setGoalsLoading] = useState(false);
 
   // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
@@ -142,6 +149,7 @@ const CustomerDashboard = ({ navigation }) => {
   useEffect(() => {
     loadProducts();
     loadPersonalizedRecommendations();
+    loadActiveGoals(); // Load sustainability goals
     
     // Test authentication for debugging
     testAuthToken().then(result => {
@@ -290,6 +298,39 @@ const CustomerDashboard = ({ navigation }) => {
     }
   };
 
+  // Load active sustainability goals
+  const loadActiveGoals = async () => {
+    if (!auth) {
+      console.log('No auth token available for goals');
+      return;
+    }
+
+    try {
+      setGoalsLoading(true);
+      
+      // Load active goals
+      const goalsResponse = await SustainabilityGoalService.getUserGoals(auth);
+      if (goalsResponse.success) {
+        // Filter only active goals and limit to top 3 for dashboard
+        const active = goalsResponse.goals.filter(goal => goal.isActive).slice(0, 3);
+        setActiveGoals(active);
+        console.log('✅ Loaded active goals for dashboard:', active.length);
+      }
+
+      // Load goal statistics
+      const statsResponse = await SustainabilityGoalService.getGoalStats(auth);
+      if (statsResponse.success) {
+        setGoalStats(statsResponse.stats);
+        console.log('✅ Loaded goal statistics');
+      }
+    } catch (error) {
+      console.error('Error loading sustainability goals:', error);
+      // Don't show alert, just log the error
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
   // Load products from API
   const loadProducts = async (showLoader = true) => {
     try {
@@ -433,6 +474,142 @@ const CustomerDashboard = ({ navigation }) => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, selectedCategory, selectedSort]);
 
+  // Render sustainability goals header component
+  const renderGoalsHeader = useCallback(() => {
+    if (activeGoals.length === 0 && !goalsLoading) return null;
+
+    return (
+      <View style={styles.goalsContainer}>
+        <View style={styles.goalsHeaderRow}>
+          <View style={styles.goalsHeaderLeft}>
+            <Text style={styles.goalsTitle}>🎯 Your Sustainability Goals</Text>
+            {goalStats && (
+              <Text style={styles.goalsSubtitle}>
+                {goalStats.activeGoals} active • {goalStats.achievedGoals} achieved
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity 
+            style={styles.goalsViewAllButton}
+            onPress={() => navigation.navigate('SustainabilityGoals')}
+          >
+            <Text style={styles.goalsViewAllText}>View All</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {goalsLoading ? (
+          <View style={styles.goalsLoadingContainer}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text style={styles.goalsLoadingText}>Loading goals...</Text>
+          </View>
+        ) : (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.goalsScrollView}
+            contentContainerStyle={styles.goalsScrollContent}
+          >
+            {activeGoals.map((goal) => (
+              <TouchableOpacity
+                key={goal._id}
+                style={styles.goalCard}
+                onPress={() => navigation.navigate('GoalProgress', { goal })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.goalCardHeader}>
+                  <Text style={styles.goalCardTitle} numberOfLines={2}>
+                    {goal.title}
+                  </Text>
+                  <View style={[
+                    styles.goalTypeIndicator,
+                    { backgroundColor: getGoalTypeColor(goal.goalType) }
+                  ]}>
+                    <Text style={styles.goalTypeText}>
+                      {getGoalTypeLabel(goal.goalType)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.goalProgressContainer}>
+                  <View style={styles.goalProgressBarBackground}>
+                    <View 
+                      style={[
+                        styles.goalProgressBarFill,
+                        { 
+                          width: `${Math.min(goal.progress.currentPercentage / goal.goalConfig.percentage * 100, 100)}%`,
+                          backgroundColor: SustainabilityGoalService.getGoalProgressColor(
+                            goal.progress.currentPercentage,
+                            goal.goalConfig.percentage
+                          )
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.goalProgressText}>
+                    {goal.progress.currentPercentage}% of {goal.goalConfig.percentage}%
+                  </Text>
+                </View>
+
+                <View style={styles.goalCardFooter}>
+                  <Text style={styles.goalStatsText}>
+                    {goal.progress.goalMetPurchases}/{goal.progress.totalPurchases} purchases
+                  </Text>
+                  <Text style={[
+                    styles.goalStatusText,
+                    { 
+                      color: SustainabilityGoalService.getGoalProgressColor(
+                        goal.progress.currentPercentage,
+                        goal.goalConfig.percentage
+                      )
+                    }
+                  ]}>
+                    {SustainabilityGoalService.getGoalProgressStatus(
+                      goal.progress.currentPercentage,
+                      goal.goalConfig.percentage
+                    )}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {/* Add new goal card */}
+            <TouchableOpacity
+              style={[styles.goalCard, styles.addGoalCard]}
+              onPress={() => navigation.navigate('GoalSetup', { mode: 'create' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.addGoalContent}>
+                <Ionicons name="add-circle" size={32} color={theme.colors.primary} />
+                <Text style={styles.addGoalText}>Add New Goal</Text>
+                <Text style={styles.addGoalSubtext}>Set a sustainability target</Text>
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+      </View>
+    );
+  }, [activeGoals, goalStats, goalsLoading, navigation]);
+
+  // Helper functions for goal display
+  const getGoalTypeColor = (goalType) => {
+    const colors = {
+      'grade-based': theme.colors.primary,
+      'score-based': theme.colors.info,
+      'category-based': theme.colors.secondary,
+    };
+    return colors[goalType] || theme.colors.textSecondary;
+  };
+
+  const getGoalTypeLabel = (goalType) => {
+    const labels = {
+      'grade-based': 'Grade',
+      'score-based': 'Score', 
+      'category-based': 'Category',
+    };
+    return labels[goalType] || 'Custom';
+  };
+
   // Get products to display based on current view
   const getDisplayProducts = () => {
     console.log('getDisplayProducts called:');
@@ -459,6 +636,7 @@ const CustomerDashboard = ({ navigation }) => {
     setIsRefreshing(true);
     loadProducts(false);
     loadPersonalizedRecommendations();
+    loadActiveGoals(); // Refresh goals too
   }, []);
 
   // Filter products locally (API handles sorting)
@@ -760,7 +938,12 @@ const CustomerDashboard = ({ navigation }) => {
         key={isListView ? 'list' : 'grid'}
         columnWrapperStyle={!isListView && styles.gridRow}
         contentContainerStyle={styles.productList}
-        ListHeaderComponent={renderFiltersHeader}
+        ListHeaderComponent={() => (
+          <>
+            {renderGoalsHeader()}
+            {renderFiltersHeader()}
+          </>
+        )}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
@@ -1206,6 +1389,149 @@ const styles = StyleSheet.create({
     color: 'red',
     fontWeight: 'bold',
     marginTop: theme.spacing.xs,
+  },
+
+  // Sustainability Goals Styles
+  goalsContainer: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.m,
+    ...theme.shadows.card,
+  },
+  goalsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.m,
+  },
+  goalsHeaderLeft: {
+    flex: 1,
+  },
+  goalsTitle: {
+    fontSize: theme.typography.fontSize.h6,
+    fontWeight: theme.typography.fontWeight.semiBold,
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+  goalsSubtitle: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+  },
+  goalsViewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+  },
+  goalsViewAllText: {
+    fontSize: theme.typography.fontSize.body2,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeight.medium,
+    marginRight: 4,
+  },
+  goalsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.l,
+  },
+  goalsLoadingText: {
+    fontSize: theme.typography.fontSize.body2,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.s,
+  },
+  goalsScrollView: {
+    marginHorizontal: -theme.spacing.xs,
+  },
+  goalsScrollContent: {
+    paddingHorizontal: theme.spacing.xs,
+  },
+  goalCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.m,
+    marginHorizontal: theme.spacing.xs,
+    width: 200,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    ...theme.shadows.small,
+  },
+  goalCardHeader: {
+    marginBottom: theme.spacing.s,
+  },
+  goalCardTitle: {
+    fontSize: theme.typography.fontSize.body1,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    minHeight: 40,
+  },
+  goalTypeIndicator: {
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.m,
+    alignSelf: 'flex-start',
+  },
+  goalTypeText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.textOnPrimary,
+  },
+  goalProgressContainer: {
+    marginBottom: theme.spacing.s,
+  },
+  goalProgressBarBackground: {
+    height: 6,
+    backgroundColor: theme.colors.borderLight,
+    borderRadius: theme.borderRadius.s,
+    marginBottom: theme.spacing.xs,
+    overflow: 'hidden',
+  },
+  goalProgressBarFill: {
+    height: '100%',
+    borderRadius: theme.borderRadius.s,
+  },
+  goalProgressText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  goalCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goalStatsText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textLight,
+  },
+  goalStatusText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  addGoalCard: {
+    borderStyle: 'dashed',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addGoalContent: {
+    alignItems: 'center',
+  },
+  addGoalText: {
+    fontSize: theme.typography.fontSize.body2,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.primary,
+    marginTop: theme.spacing.s,
+  },
+  addGoalSubtext: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
 
