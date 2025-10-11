@@ -4,6 +4,12 @@
  */
 
 import { API_BASE_URL } from '../config/api';
+import GoalProgressCalculator, { 
+  GradeBasedCalculator, 
+  ScoreBasedCalculator, 
+  CategoryBasedCalculator,
+  ProgressUtils 
+} from '../utils/GoalProgressCalculator';
 
 class SustainabilityGoalService {
   // Get all user's sustainability goals
@@ -186,26 +192,9 @@ class SustainabilityGoalService {
     const matchingGoals = [];
 
     for (const goal of activeGoals) {
-      let meetsGoal = false;
-
-      switch (goal.goalType) {
-        case 'grade-based':
-          meetsGoal = goal.goalConfig.targetGrades.includes(product.sustainabilityGrade);
-          break;
-        
-        case 'score-based':
-          meetsGoal = product.sustainabilityScore >= goal.goalConfig.minimumScore;
-          break;
-        
-        case 'category-based':
-          meetsGoal = goal.goalConfig.categories.includes(product.category) &&
-                     goal.goalConfig.targetGrades.includes(product.sustainabilityGrade);
-          break;
-        
-        default:
-          meetsGoal = false;
-      }
-
+      // Use the advanced calculator for product alignment checking
+      const meetsGoal = GoalProgressCalculator.checkProductAlignment(product, goal);
+      
       if (meetsGoal) {
         matchingGoals.push({
           goalId: goal._id,
@@ -217,7 +206,9 @@ class SustainabilityGoalService {
 
     return {
       meetsAnyGoal: matchingGoals.length > 0,
-      matchingGoals
+      matchingGoals,
+      totalGoals: activeGoals.length,
+      alignmentPercentage: (matchingGoals.length / activeGoals.length) * 100
     };
   }
 
@@ -283,12 +274,8 @@ class SustainabilityGoalService {
 
   // Helper method to get goal progress color
   static getGoalProgressColor(progressPercentage, targetPercentage) {
-    const ratio = progressPercentage / targetPercentage;
-    
-    if (ratio >= 1) return '#4CAF50'; // Green - Achieved
-    if (ratio >= 0.7) return '#FF9800'; // Orange - Close
-    if (ratio >= 0.3) return '#2196F3'; // Blue - In Progress
-    return '#9E9E9E'; // Gray - Starting
+    // Use the advanced progress utilities for better color calculation
+    return ProgressUtils.getProgressColor(progressPercentage, targetPercentage, 'eco');
   }
 
   // Helper method to get goal progress status text
@@ -299,6 +286,118 @@ class SustainabilityGoalService {
     if (ratio >= 0.7) return 'Almost There';
     if (ratio >= 0.3) return 'In Progress';
     return 'Getting Started';
+  }
+
+  // Advanced Progress Calculation Methods using GoalProgressCalculator
+
+  /**
+   * Calculate comprehensive progress for a goal using purchase history
+   * @param {Object} goal - The goal to calculate progress for
+   * @param {Array} purchaseHistory - Array of completed orders
+   * @param {Object} options - Calculation options
+   * @returns {Object} Detailed progress information
+   */
+  static calculateAdvancedProgress(goal, purchaseHistory, options = {}) {
+    try {
+      // Use specialized calculators based on goal type
+      switch (goal.goalType) {
+        case 'grade_based':
+        case 'grade-based':
+          return GradeBasedCalculator.calculateProgress(goal, purchaseHistory, options);
+        
+        case 'score_based':  
+        case 'score-based':
+          return ScoreBasedCalculator.calculateProgress(goal, purchaseHistory, options);
+        
+        case 'category_based':
+        case 'category-based':
+          return CategoryBasedCalculator.calculateProgress(goal, purchaseHistory, options);
+        
+        default:
+          return GoalProgressCalculator.calculateGoalProgress(goal, purchaseHistory, options);
+      }
+    } catch (error) {
+      console.error('Error calculating advanced progress:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Batch calculate progress for multiple goals
+   * @param {Array} goals - Array of goals
+   * @param {Array} purchaseHistory - Purchase history
+   * @param {Object} options - Calculation options
+   * @returns {Map} Map of goalId -> progress
+   */
+  static batchCalculateProgress(goals, purchaseHistory, options = {}) {
+    try {
+      return GoalProgressCalculator.batchCalculateProgress(goals, purchaseHistory, options);
+    } catch (error) {
+      console.error('Error in batch progress calculation:', error);
+      return new Map();
+    }
+  }
+
+  /**
+   * Update goal progress with new purchase
+   * @param {Object} currentProgress - Current progress state
+   * @param {Object} newPurchase - New purchase data
+   * @param {Object} goal - The goal being tracked
+   * @returns {Object} Updated progress
+   */
+  static updateProgressWithPurchase(currentProgress, newPurchase, goal) {
+    try {
+      return GoalProgressCalculator.updateGoalProgress(currentProgress, newPurchase, goal);
+    } catch (error) {
+      console.error('Error updating progress with purchase:', error);
+      return currentProgress;
+    }
+  }
+
+  /**
+   * Get goal difficulty assessment
+   * @param {Object} goal - The goal to assess
+   * @param {Object} marketData - Optional market data for context
+   * @returns {number} Difficulty score (1-5)
+   */
+  static assessGoalDifficulty(goal, marketData = {}) {
+    try {
+      return ProgressUtils.calculateDifficulty(goal, marketData);
+    } catch (error) {
+      console.error('Error assessing goal difficulty:', error);
+      return 2; // Default medium difficulty
+    }
+  }
+
+  /**
+   * Compare progress between two time periods
+   * @param {Object} currentProgress - Current progress
+   * @param {Object} previousProgress - Previous period progress
+   * @returns {Object} Comparison data
+   */
+  static compareProgress(currentProgress, previousProgress) {
+    try {
+      return ProgressUtils.compareProgress(currentProgress, previousProgress);
+    } catch (error) {
+      console.error('Error comparing progress:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate progress projections for a goal
+   * @param {Object} goal - The goal
+   * @param {Array} purchaseHistory - Purchase history for trend analysis
+   * @returns {Object} Projection data
+   */
+  static generateProgressProjections(goal, purchaseHistory) {
+    try {
+      const progress = this.calculateAdvancedProgress(goal, purchaseHistory, { includeProjections: true });
+      return progress?.projections || null;
+    } catch (error) {
+      console.error('Error generating progress projections:', error);
+      return null;
+    }
   }
 }
 
