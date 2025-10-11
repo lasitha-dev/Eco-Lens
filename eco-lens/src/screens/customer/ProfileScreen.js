@@ -108,12 +108,12 @@ const ProfileScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('OrderHistory'),
     },
     {
-      id: 'sustainability',
-      title: 'Sustainability Impact',
-      subtitle: 'Track your eco-friendly choices',
-      icon: '🌱',
+      id: 'sustainability_goals',
+      title: 'Sustainability Goals',
+      subtitle: 'Set and track your eco-friendly targets',
+      icon: '🎯',
       iconColor: '#66BB6A',
-      onPress: () => Alert.alert('Coming Soon', 'Sustainability tracking will be available in a future update.'),
+      onPress: () => navigation.navigate('SustainabilityGoals'),
     },
   ];
 
