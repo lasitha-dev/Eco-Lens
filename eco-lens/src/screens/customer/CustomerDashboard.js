@@ -35,6 +35,7 @@ import DynamicRecommendationService from '../../api/dynamicRecommendationService
 import CartService from '../../api/cartService';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import GoalProgressCard from '../../components/goals/GoalProgressCard';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
 import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
@@ -45,6 +46,16 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const CustomerDashboard = ({ navigation }) => {
   const { user, auth } = useAuth();
+  
+  // Use real-time goals context instead of manual state management
+  const {
+    activeGoals,
+    goalStats,
+    loading: goalsLoading,
+    refreshGoals,
+    hasActiveGoals,
+    validateCartAgainstGoals,
+  } = useRealtimeGoals();
 
   // State management
   const [products, setProducts] = useState([]);
@@ -73,11 +84,6 @@ const CustomerDashboard = ({ navigation }) => {
   // Cart toast state
   const [showCartToast, setShowCartToast] = useState(false);
   const [cartToastMessage, setCartToastMessage] = useState('');
-
-  // Sustainability goals state
-  const [activeGoals, setActiveGoals] = useState([]);
-  const [goalStats, setGoalStats] = useState(null);
-  const [goalsLoading, setGoalsLoading] = useState(false);
 
   // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
@@ -150,7 +156,7 @@ const CustomerDashboard = ({ navigation }) => {
   useEffect(() => {
     loadProducts();
     loadPersonalizedRecommendations();
-    loadActiveGoals(); // Load sustainability goals
+    // Goals are now automatically loaded by the RealtimeGoalProvider
     
     // Test authentication for debugging
     testAuthToken().then(result => {
@@ -296,39 +302,6 @@ const CustomerDashboard = ({ navigation }) => {
           console.error('Error loading basic recommendations:', fallbackError);
         }
       }
-    }
-  };
-
-  // Load active sustainability goals
-  const loadActiveGoals = async () => {
-    if (!auth) {
-      console.log('No auth token available for goals');
-      return;
-    }
-
-    try {
-      setGoalsLoading(true);
-      
-      // Load active goals
-      const goalsResponse = await SustainabilityGoalService.getUserGoals(auth);
-      if (goalsResponse.success) {
-        // Filter only active goals and limit to top 3 for dashboard
-        const active = goalsResponse.goals.filter(goal => goal.isActive).slice(0, 3);
-        setActiveGoals(active);
-        console.log('✅ Loaded active goals for dashboard:', active.length);
-      }
-
-      // Load goal statistics
-      const statsResponse = await SustainabilityGoalService.getGoalStats(auth);
-      if (statsResponse.success) {
-        setGoalStats(statsResponse.stats);
-        console.log('✅ Loaded goal statistics');
-      }
-    } catch (error) {
-      console.error('Error loading sustainability goals:', error);
-      // Don't show alert, just log the error
-    } finally {
-      setGoalsLoading(false);
     }
   };
 
@@ -584,8 +557,8 @@ const CustomerDashboard = ({ navigation }) => {
     setIsRefreshing(true);
     loadProducts(false);
     loadPersonalizedRecommendations();
-    loadActiveGoals(); // Refresh goals too
-  }, []);
+    refreshGoals(); // Use real-time goals refresh
+  }, [refreshGoals]);
 
   // Filter products locally (API handles sorting)
   const filteredProducts = useMemo(() => {

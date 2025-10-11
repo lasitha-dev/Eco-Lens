@@ -26,6 +26,7 @@ import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
 
@@ -33,14 +34,21 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const CartScreen = ({ navigation }) => {
   const { user, auth: token } = useAuth();
+  
+  // Use real-time goals context
+  const { 
+    activeGoals, 
+    validateCartAgainstGoals,
+    trackPurchaseProgress 
+  } = useRealtimeGoals();
+  // Cart state
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
   
-  // Sustainability goals state
-  const [activeGoals, setActiveGoals] = useState([]);
-  const [goalValidation, setGoalValidation] = useState({});
+  // Real-time goal validation (computed from context)
+  const goalValidation = validateCartAgainstGoals(cartItems);
   
   // Shipping address form - prepopulate with user data
   const [shippingAddress, setShippingAddress] = useState({
@@ -167,20 +175,15 @@ const CartScreen = ({ navigation }) => {
     console.log('📊 Cart goal validation:', validation._summary);
   }, [cartItems, activeGoals]);
 
-  // Validate cart whenever items or goals change
-  useEffect(() => {
-    validateCartAgainstGoals();
-  }, [validateCartAgainstGoals]);
-
   useEffect(() => {
     fetchCart();
-    loadActiveGoals();
+    // Goals are now automatically loaded by the RealtimeGoalProvider
   }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchCart();
-    loadActiveGoals(); // Also refresh goals
+    // Goals are automatically refreshed by the RealtimeGoalProvider
   }, []);
 
   // Function to update item quantity with optimistic updates
