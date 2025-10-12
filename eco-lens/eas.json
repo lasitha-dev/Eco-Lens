@@ -13,10 +13,27 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://eco-lens-8bn1.onrender.com/api",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "782129521115-ciietm4n47j6odv749cmfl9vgbtkmcbg.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com"
       }
     },
-    "production": {}
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://eco-lens-8bn1.onrender.com/api",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "782129521115-ciietm4n47j6odv749cmfl9vgbtkmcbg.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com"
+      }
+    }
   },
   "submit": {
     "production": {}
