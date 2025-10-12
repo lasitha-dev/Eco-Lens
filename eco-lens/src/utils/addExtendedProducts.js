@@ -6,7 +6,7 @@
 import { EXTENDED_MOCK_PRODUCTS } from './extendedMockData.js';
 
 // API configuration
-const API_BASE_URL = 'http://localhost:5000/api'; // Adjust if your backend runs on different port
+const API_BASE_URL = 'https://eco-lens-8bn1.onrender.com/api';
 
 // Function to add products to database
 export const addExtendedProductsToDatabase = async (authToken) => {
