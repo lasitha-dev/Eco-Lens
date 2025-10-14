@@ -16,7 +16,6 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import OnboardingSurvey from '../screens/OnboardingSurvey';
-import GoogleAuthCallbackScreen from '../screens/GoogleAuthCallbackScreen';
 import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
 import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
 import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
@@ -73,7 +72,6 @@ const AppNavigator = () => {
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          <Stack.Screen name="GoogleAuthCallback" component={GoogleAuthCallbackScreen} />
         </>
       )}
     </Stack.Navigator>

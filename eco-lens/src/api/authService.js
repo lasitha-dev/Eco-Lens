@@ -210,77 +210,6 @@ class AuthService {
     }
   }
 
-  static async googleLogin(idToken) {
-    try {
-      console.log(`Logging in with Google at: ${API_BASE_URL}/auth/google/token`);
-      console.log('ID Token length:', idToken ? idToken.length : 'No token provided');
-      
-      // Check if idToken is provided
-      if (!idToken) {
-        throw new Error('Google ID token is missing. This might be due to OAuth configuration issues.');
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/auth/google/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
-      });
-
-      console.log('Google login response status:', response.status);
-      console.log('Google login response headers:', [...response.headers.entries()]);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Google login server error:', errorData);
-        
-        // Provide more specific error messages
-        if (response.status === 400) {
-          throw new Error('Invalid Google token. Please try signing in again.');
-        } else if (response.status === 401) {
-          throw new Error('Authentication failed. Please check your Google account permissions.');
-        } else if (response.status === 500) {
-          throw new Error('Server error during Google authentication. Please try again later.');
-        }
-        
-        throw new Error(errorData.error || `Google login failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Google login response data:', data);
-      await this.storeAuth(data.token, data.user);
-      console.log(`✅ Google login successful for ${data.user.email}`);
-      return {
-        ...data,
-        isAdmin: data.user.role === 'admin',
-        isCustomer: data.user.role === 'customer'
-      };
-    } catch (error) {
-      console.error('Error with Google login:', error);
-      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
-        throw new Error('Unable to connect to server. Please check your network connection.');
-      }
-      throw error;
-    }
-  }
-
-  // Handle Google redirect URL (for web flow)
-  static async handleGoogleRedirect(url) {
-    try {
-      // Extract token from URL if needed
-      // This is typically not needed with Expo AuthSession as the token is in the response
-      console.log('Handling Google redirect URL:', url);
-      
-      // For now, we'll just throw an error as this shouldn't be called
-      // with the Expo AuthSession flow
-      throw new Error('Direct URL handling not implemented for Expo AuthSession flow');
-    } catch (error) {
-      console.error('Error handling Google redirect:', error);
-      throw error;
-    }
-  }
 
   // Logout user
   static async logoutUser() {
@@ -512,47 +441,6 @@ class AuthService {
     }
   }
 
-  // Google OAuth Login
-  static async googleLogin(idToken) {
-    try {
-      console.log('Sending Google ID token to backend for verification');
-      
-      const response = await fetch(`${API_BASE_URL}/auth/google/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Google login failed:', errorData);
-        throw new Error(errorData.error || 'Google login failed');
-      }
-
-      const data = await response.json();
-      console.log('Google login successful:', data);
-      
-      // Store authentication data
-      await this.storeAuth(data.token, data.user);
-      
-      return {
-        ...data,
-        isAdmin: data.user.role === 'admin',
-        isCustomer: data.user.role === 'customer'
-      };
-    } catch (error) {
-      console.error('Error with Google login:', error);
-      
-      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
-        throw new Error('Unable to connect to server. Please check your network connection.');
-      }
-      
-      throw error;
-    }
-  }
 }
 
 export default AuthService;

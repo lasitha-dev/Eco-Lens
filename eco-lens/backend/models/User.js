@@ -23,38 +23,24 @@ const userSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    default: 'Not provided', // For Google OAuth users
+    default: 'Not provided',
     trim: true
   },
   dateOfBirth: {
     type: Date,
-    default: Date.now // For Google OAuth users
+    default: Date.now
   },
   country: {
     type: String,
-    default: 'Not provided' // For Google OAuth users
-  },
-  password: {
-    type: String,
-    minlength: 8
-  },
-  googleId: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
-  authProvider: {
-    type: String,
-    enum: ['local', 'google'],
-    default: 'local'
-  },
-  profilePictureUrl: {
-    type: String,
-    default: null
+    default: 'Not provided'
   },
   phone: {
     type: String,
     trim: true
+  },
+  password: {
+    type: String,
+    minlength: 8
   },
   gender: {
     type: String,

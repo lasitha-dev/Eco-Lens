@@ -20,8 +20,8 @@ const getApiUrl = () => {
     return configUrl;
   }
   
-  // Fallback logic - use production URL
-  return 'https://eco-lens-8bn1.onrender.com/api';
+  // Fallback logic - use local development URL
+  return 'http://localhost:5002/api';
 };
 
 export const API_BASE_URL = getApiUrl();

@@ -63,15 +63,11 @@
         "projectId": "7a2a0fe2-ca55-4529-8eff-888d2cc29713"
       },
       "apiUrl": "https://eco-lens-8bn1.onrender.com/api",
-      "apiPort": "443",
-      "mobileApiUrl": "https://eco-lens-8bn1.onrender.com/api",
-      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com",
-      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "782129521115-ciietm4n47j6odv749cmfl9vgbtkmcbg.apps.googleusercontent.com",
-      "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "782129521115-uc9bfcece12ittq4kef77f9fjhe3d332.apps.googleusercontent.com"
+      "apiPort": "5002",
+      "mobileApiUrl": "https://eco-lens-8bn1.onrender.com/api"
     },
     "scheme": "eco-lens",
     "plugins": [
-      "expo-web-browser",
       [
         "expo-image-picker",
         {

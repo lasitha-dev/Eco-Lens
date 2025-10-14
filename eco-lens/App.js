@@ -3,13 +3,9 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
 import { FavoritesProvider } from "./src/hooks/useFavorites";
 import AppNavigator from './src/navigation/AppNavigator';
-
-// Add this line to properly handle redirects
-WebBrowser.maybeCompleteAuthSession();
 
 // Simple loading splash component
 const LoadingSplash = () => {
@@ -36,7 +32,6 @@ const Navigation = () => {
     config: {
       screens: {
         Login: 'login',
-        GoogleAuthCallback: 'auth/google-callback',
         // Add a fallback for any other routes
         '*': '*',
       },
