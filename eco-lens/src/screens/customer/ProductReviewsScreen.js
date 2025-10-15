@@ -44,7 +44,10 @@ const ProductReviewsScreen = ({ route, navigation }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setReviews(data.ratings || []);
+        // Ensure we have a valid array and each item has a unique key
+        const reviewsData = Array.isArray(data.ratings) ? data.ratings : [];
+        console.log('Raw reviews data:', reviewsData);
+        setReviews(reviewsData);
       } else {
         console.error('Error fetching reviews:', data.error);
         Alert.alert('Error', 'Failed to load reviews. Please try again.');
@@ -67,7 +70,14 @@ const ProductReviewsScreen = ({ route, navigation }) => {
     fetchReviews();
   };
 
-  const renderReviewItem = ({ item }) => (
+  const renderReviewItem = ({ item }) => {
+    // Safety check to ensure item exists
+    if (!item) {
+      console.warn('Review item is null or undefined');
+      return null;
+    }
+    
+    return (
     <View style={styles.reviewItem}>
       <View style={styles.reviewHeader}>
         <View style={styles.userInfo}>
@@ -100,7 +110,8 @@ const ProductReviewsScreen = ({ route, navigation }) => {
         <Text style={styles.reviewText}>{item.review}</Text>
       )}
     </View>
-  );
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -162,9 +173,9 @@ const ProductReviewsScreen = ({ route, navigation }) => {
 
       {/* Reviews List */}
       <FlatList
-        data={reviews}
+        data={Array.isArray(reviews) ? reviews : []}
         renderItem={renderReviewItem}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => item?._id || `review-${index}-${Date.now()}`}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={

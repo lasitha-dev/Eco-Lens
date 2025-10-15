@@ -755,7 +755,7 @@ const CustomerDashboard = ({ navigation }) => {
             isListView={isListView}
           />
         )}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id || item?._id || `product-${index}`}
         numColumns={isListView ? 1 : 2}
         key={isListView ? 'list' : 'grid'}
         columnWrapperStyle={!isListView && styles.gridRow}

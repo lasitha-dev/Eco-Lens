@@ -503,7 +503,7 @@ const AdminDashboard = ({ navigation }) => {
             <FlatList
               data={filteredProducts}
               renderItem={renderProductItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => item?.id || item?._id || `product-${index}`}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.productsList}
               refreshing={isRefreshing}
