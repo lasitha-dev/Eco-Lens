@@ -4,6 +4,7 @@ const ProductRating = require('../models/ProductRating');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { authenticateToken } = require('../middleware/auth');
+const RatingCalculationService = require('../services/RatingCalculationService');
 
 const router = express.Router();
 
@@ -66,7 +67,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     await productRating.save();
 
     // Update product rating statistics
-    await updateProductRatingStats(productId);
+    await RatingCalculationService.updateProductRatingStats(productId);
 
     // Populate the rating with user info for response
     await productRating.populate('user', 'firstName lastName');
@@ -163,7 +164,7 @@ router.patch('/:ratingId', authenticateToken, async (req, res) => {
     await productRating.save();
 
     // Update product rating statistics
-    await updateProductRatingStats(productRating.product);
+    await RatingCalculationService.updateProductRatingStats(productRating.product);
 
     res.json({
       message: 'Rating updated successfully',
@@ -198,7 +199,7 @@ router.delete('/:ratingId', authenticateToken, async (req, res) => {
     await productRating.save();
 
     // Update product rating statistics
-    await updateProductRatingStats(productId);
+    await RatingCalculationService.updateProductRatingStats(productId);
 
     res.json({ message: 'Rating deleted successfully' });
 
@@ -255,26 +256,5 @@ router.get('/pending-ratings', authenticateToken, async (req, res) => {
   }
 });
 
-// Helper function to update product rating statistics
-async function updateProductRatingStats(productId) {
-  try {
-    const stats = await ProductRating.calculateAverageRating(productId);
-    
-    await Product.findByIdAndUpdate(productId, {
-      $set: {
-        rating: stats.averageRating,
-        reviewCount: stats.totalRatings,
-        'ratingStats.averageRating': stats.averageRating,
-        'ratingStats.totalRatings': stats.totalRatings,
-        'ratingStats.ratingDistribution': stats.ratingDistribution,
-        'ratingStats.lastUpdated': new Date()
-      }
-    });
-
-    console.log(`Updated rating stats for product ${productId}:`, stats);
-  } catch (error) {
-    console.error('Error updating product rating stats:', error);
-  }
-}
 
 module.exports = router;
