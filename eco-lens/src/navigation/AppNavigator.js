@@ -20,6 +20,7 @@ import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
 import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
 import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
 import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
+import ProductReviewsScreen from '../screens/customer/ProductReviewsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -62,6 +63,7 @@ const AppNavigator = () => {
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} />
             <Stack.Screen name="PaymentReview" component={PaymentReviewScreen} />
+            <Stack.Screen name="ProductReviews" component={ProductReviewsScreen} />
           </>
         )
       ) : (

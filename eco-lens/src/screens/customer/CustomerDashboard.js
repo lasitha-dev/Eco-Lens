@@ -779,6 +779,7 @@ const CustomerDashboard = ({ navigation }) => {
         product={selectedProduct}
         onClose={() => setIsModalVisible(false)}
         onAddToCart={handleAddToCart}
+        navigation={navigation}
       />
       
       {/* Auth Debugger */}
