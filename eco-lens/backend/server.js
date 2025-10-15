@@ -16,6 +16,7 @@ const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
 const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
+const ratingRoutes = require('./routes/ratingRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -26,8 +27,10 @@ app.use(cors({
     'http://localhost:8081',  // Expo dev server
     'http://localhost:19006', // Expo web
     'http://localhost:5002',  // Backend itself
-    'http://10.38.245.146:8081', // Mobile network IP
-    'http://10.38.245.146:19006', // Web network IP
+    'http://192.168.8.143:8081', // Mobile network IP
+    'http://192.168.8.143:19006', // Web network IP
+    'http://10.38.245.146:8081', // Mobile network IP (old)
+    'http://10.38.245.146:19006', // Web network IP (old)
     'https://auth.expo.io', // Expo auth proxy
     'eco-lens://oauth/redirect' // Custom scheme for mobile OAuth
   ],
@@ -607,6 +610,9 @@ app.use('/api/search', searchAnalyticsRoutes);
 
 // Dynamic Recommendation Routes
 app.use('/api/dynamic', dynamicRecommendationRoutes);
+
+// Rating Routes
+app.use('/api/ratings', ratingRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

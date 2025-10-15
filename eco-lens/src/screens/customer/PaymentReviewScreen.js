@@ -22,11 +22,14 @@ import theme from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
+import PostPurchaseRatingManager from '../../components/PostPurchaseRatingManager';
 
 const PaymentReviewScreen = ({ route, navigation }) => {
   const { shippingAddress, cartItems, totalAmount, paymentDetails } = route.params;
   const { auth: token } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const [showRatingFlow, setShowRatingFlow] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState(null);
 
   // Mask card number (show last 4 digits)
   const maskCardNumber = (cardNumber) => {
@@ -60,34 +63,9 @@ const PaymentReviewScreen = ({ route, navigation }) => {
       const data = await response.json();
 
       if (data.success) {
-        // Payment successful
-        Alert.alert(
-          'Payment Successful! 🎉',
-          `Your order ${data.order.orderNumber} has been placed successfully.`,
-          [
-            {
-              text: 'View Order',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [
-                    { name: 'Dashboard' },
-                    { name: 'OrderDetails', params: { orderId: data.order._id } }
-                  ],
-                });
-              },
-            },
-            {
-              text: 'Continue Shopping',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Dashboard' }],
-                });
-              },
-            },
-          ]
-        );
+        // Payment successful - store order data and show rating flow
+        setCompletedOrder(data.order);
+        setShowRatingFlow(true);
       } else {
         Alert.alert('Payment Failed', data.error || 'Failed to process payment. Please try again.');
       }
@@ -97,6 +75,38 @@ const PaymentReviewScreen = ({ route, navigation }) => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  // Handle rating flow completion
+  const handleRatingFlowComplete = () => {
+    setShowRatingFlow(false);
+    Alert.alert(
+      'Thank You! 🎉',
+      `Your order ${completedOrder.orderNumber} has been placed successfully.`,
+      [
+        {
+          text: 'View Order',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Dashboard' },
+                { name: 'OrderDetails', params: { orderId: completedOrder._id } }
+              ],
+            });
+          },
+        },
+        {
+          text: 'Continue Shopping',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -224,6 +234,15 @@ const PaymentReviewScreen = ({ route, navigation }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Post-Purchase Rating Flow */}
+      <PostPurchaseRatingManager
+        visible={showRatingFlow}
+        onComplete={handleRatingFlowComplete}
+        orderId={completedOrder?._id}
+        orderItems={cartItems}
+        authToken={token}
+      />
     </SafeAreaView>
   );
 };

@@ -62,9 +62,9 @@
       "eas": {
         "projectId": "7a2a0fe2-ca55-4529-8eff-888d2cc29713"
       },
-      "apiUrl": "https://eco-lens-8bn1.onrender.com/api",
+      "apiUrl": "http://192.168.8.143:5002/api",
       "apiPort": "5002",
-      "mobileApiUrl": "https://eco-lens-8bn1.onrender.com/api"
+      "mobileApiUrl": "http://192.168.8.143:5002/api"
     },
     "scheme": "eco-lens",
     "plugins": [
