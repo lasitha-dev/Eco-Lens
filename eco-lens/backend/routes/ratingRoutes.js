@@ -94,32 +94,16 @@ router.get('/product/:productId', async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Get ratings with pagination
-    const ratings = await ProductRating.getProductRatings(
-      productId, 
-      parseInt(limit), 
-      parseInt(skip)
-    );
-
-    // Get total count for pagination
-    const totalRatings = await ProductRating.countDocuments({
-      product: productId,
-      isVisible: true
-    });
-
-    // Get rating statistics
-    const stats = await ProductRating.calculateAverageRating(productId);
+    // Get all ratings for the product
+    const ratings = await ProductRating.find({ 
+      product: productId 
+    })
+    .populate('user', 'firstName lastName profilePicture')
+    .sort({ createdAt: -1 });
 
     res.json({
-      ratings,
-      stats,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalRatings / limit),
-        totalRatings,
-        hasNext: skip + ratings.length < totalRatings,
-        hasPrev: page > 1
-      }
+      success: true,
+      ratings
     });
 
   } catch (error) {

@@ -34,7 +34,7 @@ const ProductReviewsScreen = ({ route, navigation }) => {
   // Fetch product reviews
   const fetchReviews = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ratings/${product.id}`, {
+      const response = await fetch(`${API_BASE_URL}/ratings/product/${product.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
