@@ -116,7 +116,7 @@ const AdminSettingsScreen = ({ navigation }) => {
       }
 
       // Save to backend
-      const response = await fetch(`${AuthService.API_BASE_URL || 'http://10.38.245.146:5002/api'}/profile/fingerprint-settings`, {
+      const response = await fetch(`${AuthService.API_BASE_URL}/profile/fingerprint-settings`, {
         method: 'PATCH',
         headers: await AuthService.getAuthHeaders(),
         body: JSON.stringify({ fingerprintEnabled: true })
@@ -158,7 +158,7 @@ const AdminSettingsScreen = ({ navigation }) => {
               setIsSaving(true);
 
               // Save to backend
-              const response = await fetch(`${AuthService.API_BASE_URL || 'http://10.38.245.146:5002/api'}/profile/fingerprint-settings`, {
+              const response = await fetch(`${AuthService.API_BASE_URL}/profile/fingerprint-settings`, {
                 method: 'PATCH',
                 headers: await AuthService.getAuthHeaders(),
                 body: JSON.stringify({ fingerprintEnabled: false })
