@@ -17,6 +17,7 @@ const surveyRoutes = require('./routes/surveyRoutes');
 const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
 const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
 const sustainabilityGoalRoutes = require('./routes/sustainabilityGoalRoutes');
+const ratingRoutes = require('./routes/ratingRoutes');
 const app = express();
 const PORT = process.env.PORT || 5002;
 
@@ -26,8 +27,10 @@ app.use(cors({
     'http://localhost:8081',  // Expo dev server
     'http://localhost:19006', // Expo web
     'http://localhost:5002',  // Backend itself
-    'http://10.38.245.146:8081', // Mobile network IP
-    'http://10.38.245.146:19006' // Web network IP
+    'http://192.168.8.143:8081', // Mobile network IP
+    'http://192.168.8.143:19006', // Web network IP
+    'http://10.38.245.146:8081', // Mobile network IP (alternate)
+    'http://10.38.245.146:19006' // Web network IP (alternate)
   ],
   credentials: true,
   optionsSuccessStatus: 200
@@ -320,7 +323,8 @@ app.post('/api/login', async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role || 'customer',
-        profilePicture: user.profilePicture || null
+        profilePicture: user.profilePicture || null,
+        fingerprintEnabled: user.fingerprintEnabled || false
       }
     });
 
@@ -351,7 +355,9 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
         country: user.country,
         phone: user.phone,
         gender: user.gender,
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        role: user.role,
+        fingerprintEnabled: user.fingerprintEnabled || false
       }
     });
 
@@ -395,6 +401,39 @@ app.post('/api/profile/delete-photo', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Profile photo delete error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update fingerprint setting
+app.patch('/api/profile/fingerprint-settings', authenticateToken, async (req, res) => {
+  try {
+    const { fingerprintEnabled } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (typeof fingerprintEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'fingerprintEnabled must be a boolean value' });
+    }
+
+    // Update user's fingerprint setting
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { fingerprintEnabled },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Fingerprint setting updated successfully',
+      fingerprintEnabled: updatedUser.fingerprintEnabled
+    });
+
+  } catch (error) {
+    console.error('Fingerprint setting update error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -562,6 +601,9 @@ app.use('/api/dynamic', dynamicRecommendationRoutes);
 
 // Sustainability Goals Routes
 app.use('/api/goals', sustainabilityGoalRoutes);
+
+// Rating Routes
+app.use('/api/ratings', ratingRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

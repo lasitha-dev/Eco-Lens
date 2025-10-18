@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import AuthService from '../api/authService';
 import SurveyService from '../api/surveyService';
+import BiometricAuthService from '../services/BiometricAuthService';
 import { useAuth } from '../hooks/useAuthLogin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -34,8 +35,8 @@ const LoginScreen = ({ navigation }) => {
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const logoScale = useRef(new Animated.Value(0.5)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(1)).current;
   const logoRotate = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -80,6 +81,54 @@ const LoginScreen = ({ navigation }) => {
     return () => pulseAnimation.stop();
   }, []);
 
+  const handleBiometricAuth = async (loginResult) => {
+    try {
+      const biometricType = await BiometricAuthService.getBiometricTypeName();
+      const authResult = await BiometricAuthService.authenticate(
+        `Use ${biometricType} to access Admin Dashboard`
+      );
+
+      if (authResult.success) {
+        console.log(' Biometric authentication successful - NOW setting auth and redirecting');
+        // NOW set auth state (this will store token and trigger navigation)
+        await setAuth(loginResult);
+        // Store credentials for future quick auth
+        await BiometricAuthService.storeCredentialsForBiometric(loginResult.user.email);
+        setLoading(false);
+        navigation.navigate('AdminDashboard');
+      } else {
+        setLoading(false);
+        Alert.alert(
+          'Authentication Failed',
+          authResult.error || 'Biometric authentication failed. Please try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: () => {
+                setLoading(true);
+                handleBiometricAuth(loginResult);
+              }
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: async () => {
+                // Logout on cancel - clear auth state
+                await AuthService.logoutUser();
+                setEmail('');
+                setPassword('');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Biometric auth error:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to authenticate with biometric. Please try again.');
+    }
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Missing Information', 'Please enter both email and password to continue.');
@@ -113,14 +162,24 @@ const LoginScreen = ({ navigation }) => {
       const result = await AuthService.loginUser(email, password);
       console.log('Login successful:', result);
       
-      // Set auth context with the result
-      await setAuth(result);
-      
       // Navigate based on user role
       if (result.user.role === 'admin') {
-        console.log('✅ Admin login - redirecting to AdminDashboard');
-        navigation.navigate('AdminDashboard');
+        console.log(' Admin login detected');
+        
+        // Check if fingerprint is enabled for this admin
+        if (result.user.fingerprintEnabled) {
+          console.log(' Fingerprint enabled - prompting for biometric auth BEFORE setting auth');
+          // IMPORTANT: Don't call setAuth() yet - wait for fingerprint success
+          await handleBiometricAuth(result);
+        } else {
+          console.log(' Fingerprint not enabled - setting auth and redirecting to AdminDashboard');
+          await setAuth(result);
+          setLoading(false);
+          navigation.navigate('AdminDashboard');
+        }
       } else {
+        // For customers, set auth immediately
+        await setAuth(result);
         // Check if customer has completed or skipped the survey
         try {
           // First check if user has completed or skipped the survey locally
@@ -128,14 +187,16 @@ const LoginScreen = ({ navigation }) => {
           const surveySkipped = await AsyncStorage.getItem('@eco_lens_survey_skipped');
           
           if (surveyCompleted === 'true') {
-            console.log('✅ Customer login - survey was completed, redirecting to Dashboard');
+            console.log(' Customer login - survey was completed, redirecting to Dashboard');
             navigation.navigate('Dashboard');
+            setLoading(false);
             return;
           }
           
           if (surveySkipped === 'true') {
-            console.log('✅ Customer login - survey was skipped, redirecting to Dashboard');
+            console.log(' Customer login - survey was skipped, redirecting to Dashboard');
             navigation.navigate('Dashboard');
+            setLoading(false);
             return;
           }
 
@@ -144,26 +205,27 @@ const LoginScreen = ({ navigation }) => {
           console.log('Survey status:', surveyStatus);
           
           if (!surveyStatus.completed) {
-            console.log('✅ Customer login - redirecting to OnboardingSurvey');
+            console.log(' Customer login - redirecting to OnboardingSurvey');
             navigation.navigate('OnboardingSurvey');
           } else {
-            console.log('✅ Customer login - redirecting to Dashboard');
+            console.log(' Customer login - redirecting to Dashboard');
             navigation.navigate('Dashboard');
           }
+          setLoading(false);
         } catch (error) {
           console.error('Error checking survey status:', error);
           // If survey check fails, go to dashboard
           navigation.navigate('Dashboard');
+          setLoading(false);
         }
       }
     } catch (error) {
+      setLoading(false);
       Alert.alert(
         'Login Failed', 
         error.message || 'Unable to sign in. Please check your credentials and try again.',
         [{ text: 'Try Again', style: 'default' }]
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -361,7 +423,6 @@ const LoginScreen = ({ navigation }) => {
               </View>
               <View style={styles.buttonGlow} />
             </TouchableOpacity>
-
           </Animated.View>
 
           {/* Admin Login Hint */}

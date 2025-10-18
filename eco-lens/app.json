@@ -25,7 +25,36 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2E7D32"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "auth.expo.io",
+              "pathPrefix": "/@coder_lasitha/eco-lens"
+            },
+            {
+              "scheme": "eco-lens"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,6 +68,21 @@
       "mobileApiUrl": "http://10.38.245.146:5002/api"
     },
     "scheme": "eco-lens",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Eco-Lens to access your photos to upload product images.",
+          "cameraPermission": "Allow Eco-Lens to use your camera to take product photos."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Eco-Lens to use Face ID for secure authentication."
+        }
+      ]
+    ],
     "platforms": [
       "ios",
       "android",

@@ -448,7 +448,7 @@ const CartScreen = ({ navigation }) => {
           <FlatList
             data={cartItems}
             renderItem={renderCartItem}
-            keyExtractor={(item) => `${item.id}-${item.quantity}`}
+            keyExtractor={(item, index) => `${item?.id || item?._id || `item-${index}`}-${item.quantity}`}
             contentContainerStyle={styles.cartList}
             showsVerticalScrollIndicator={false}
             refreshControl={

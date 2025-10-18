@@ -871,7 +871,7 @@ const CustomerDashboard = ({ navigation }) => {
             showGoalChips={activeGoals.length > 0}
           />
         )}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id || item?._id || `product-${index}`}
         numColumns={isListView ? 1 : 2}
         key={isListView ? 'list' : 'grid'}
         columnWrapperStyle={!isListView && styles.gridRow}
@@ -900,6 +900,7 @@ const CustomerDashboard = ({ navigation }) => {
         product={selectedProduct}
         onClose={() => setIsModalVisible(false)}
         onAddToCart={handleAddToCart}
+        navigation={navigation}
       />
       
       {/* Auth Debugger */}

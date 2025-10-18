@@ -133,6 +133,33 @@ const productSchema = new mongoose.Schema({
     min: 0,
     default: 0
   },
+  ratingStats: {
+    averageRating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0
+    },
+    totalRatings: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    ratingDistribution: {
+      type: {
+        '1': { type: Number, default: 0 },
+        '2': { type: Number, default: 0 },
+        '3': { type: Number, default: 0 },
+        '4': { type: Number, default: 0 },
+        '5': { type: Number, default: 0 }
+      },
+      default: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
   isActive: {
     type: Boolean,
     default: true

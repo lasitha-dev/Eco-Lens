@@ -395,6 +395,29 @@ class AuthService {
     }
   }
 
+  // Update fingerprint setting
+  static async updateFingerprintSetting(fingerprintEnabled) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile/fingerprint-settings`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ fingerprintEnabled })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update fingerprint setting');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating fingerprint setting:', error);
+      throw error;
+    }
+  }
+
   // Delete profile photo
   static async deleteProfilePhoto() {
     try {

@@ -430,6 +430,12 @@ const AdminDashboard = ({ navigation }) => {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('AdminSettings')}
+          >
+            <Text style={styles.settingsButtonText}>⚙️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={styles.addButton}
             onPress={openAddForm}
           >
@@ -497,7 +503,7 @@ const AdminDashboard = ({ navigation }) => {
             <FlatList
               data={filteredProducts}
               renderItem={renderProductItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => item?.id || item?._id || `product-${index}`}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.productsList}
               refreshing={isRefreshing}
@@ -576,6 +582,22 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  
+  settingsButtonText: {
+    fontSize: 20,
   },
   
   logoutButton: {

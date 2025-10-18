@@ -19,6 +19,7 @@ import { GoalCriteriaChipList } from '../goals/GoalCriteriaChip';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import memoizedGoalService from '../../api/memoizedSustainabilityGoalService';
 import { Ionicons } from '@expo/vector-icons';
+import StarRating from '../StarRating';
 import theme from '../../styles/theme';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -198,8 +199,13 @@ const ProductCard = memo(({
         
         {/* Rating */}
         <View style={styles.ratingRow}>
-          <Text style={styles.rating}>{ratingDisplay}</Text>
-          <Text style={styles.reviewCount}>({reviewCount})</Text>
+          <StarRating 
+            rating={rating} 
+            totalRatings={reviewCount}
+            size={14}
+            showText={true}
+            showCount={true}
+          />
         </View>
         
         {/* Price and Score */}
@@ -305,8 +311,13 @@ const ProductCard = memo(({
         
         {/* Rating and Reviews */}
         <View style={styles.ratingRow}>
-          <Text style={styles.rating}>{ratingDisplay}</Text>
-          <Text style={styles.reviewCount}>({reviewCount} reviews)</Text>
+          <StarRating 
+            rating={rating} 
+            totalRatings={reviewCount}
+            size={14}
+            showText={true}
+            showCount={true}
+          />
         </View>
         
         {/* Price and Eco Score */}

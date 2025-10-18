@@ -34,13 +34,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'Not provided'
   },
-  password: {
-    type: String,
-    minlength: 8
-  },
   phone: {
     type: String,
     trim: true
+  },
+  password: {
+    type: String,
+    minlength: 8
   },
   gender: {
     type: String,
@@ -59,6 +59,10 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  fingerprintEnabled: {
+    type: Boolean,
+    default: false
   },
   favorites: [{
     type: mongoose.Schema.Types.ObjectId,

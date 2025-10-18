@@ -10,6 +10,7 @@ import SignUpScreen from '../screens/SignUpScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CustomerTabNavigator from './CustomerTabNavigator';
 import AdminDashboard from '../screens/AdminDashboard';
+import AdminSettingsScreen from '../screens/AdminSettingsScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -22,6 +23,7 @@ import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
 import SustainabilityGoalsScreen from '../screens/customer/SustainabilityGoalsScreen';
 import GoalSetupScreen from '../screens/customer/GoalSetupScreen';
 import GoalProgressScreen from '../screens/customer/GoalProgressScreen';
+import ProductReviewsScreen from '../screens/customer/ProductReviewsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -50,6 +52,7 @@ const AppNavigator = () => {
           // Admin screens
           <>
             <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+            <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
           </>
         ) : (
           // Customer screens
@@ -67,6 +70,8 @@ const AppNavigator = () => {
             <Stack.Screen name="SustainabilityGoals" component={SustainabilityGoalsScreen} />
             <Stack.Screen name="GoalSetup" component={GoalSetupScreen} />
             <Stack.Screen name="GoalProgress" component={GoalProgressScreen} />
+            {/* Product Reviews Screen */}
+            <Stack.Screen name="ProductReviews" component={ProductReviewsScreen} />
           </>
         )
       ) : (
