@@ -109,11 +109,19 @@ const ProfileScreen = ({ navigation }) => {
     },
     {
       id: 'sustainability',
-      title: 'Sustainability Impact',
-      subtitle: 'Track your eco-friendly choices',
-      icon: '🌱',
+      title: 'Sustainability Goals',
+      subtitle: 'Set and track your eco friendly targets',
+      icon: '🎯',
       iconColor: '#66BB6A',
       onPress: () => Alert.alert('Coming Soon', 'Sustainability tracking will be available in a future update.'),
+    },
+    {
+      id: 'notifications',
+      title: 'Notification Settings',
+      subtitle: 'Manage your notification preferences',
+      icon: '🔔',
+      iconColor: '#9C27B0',
+      onPress: () => navigation.navigate('NotificationSettings'),
     },
   ];
 

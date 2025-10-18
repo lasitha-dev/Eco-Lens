@@ -20,6 +20,8 @@ import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
 import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
 import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
 import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
+import NotificationsScreen from '../screens/customer/NotificationsScreen';
+import NotificationSettingsScreen from '../screens/customer/NotificationSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,6 +63,8 @@ const AppNavigator = () => {
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} />
             <Stack.Screen name="PaymentReview" component={PaymentReviewScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
           </>
         )
       ) : (

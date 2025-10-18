@@ -33,9 +33,9 @@ const getApiUrl = () => {
       return `http://${debuggerHost}:5002/api`;
     }
     
-    // Final fallback - use detected WiFi IP address
-    console.warn('Could not auto-detect IP address from Expo. Using detected WiFi IP.');
-    return 'http://10.38.245.146:5002/api'; // Your computer's WiFi IP address
+    // Final fallback - use localhost for web, or current network IP
+    console.warn('Could not auto-detect IP address from Expo. Using localhost.');
+    return 'http://localhost:5002/api'; // Use localhost as fallback
   }
 };
 

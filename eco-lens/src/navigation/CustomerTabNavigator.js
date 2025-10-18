@@ -12,6 +12,7 @@ import CustomerDashboard from '../screens/customer/CustomerDashboard';
 import CartScreen from '../screens/customer/CartScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
 import FavoritesScreen from '../screens/customer/FavoritesScreen';
+import NotificationsScreen from '../screens/customer/NotificationsScreen';
 import theme from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
@@ -121,6 +122,23 @@ const CustomerTabNavigator = () => {
               focused={focused}
               color={color}
               label="Favorites"
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Alerts"
+        component={NotificationsScreen}
+        options={{
+          title: 'Alerts',
+          tabBarIcon: ({ color, size, focused }) => (
+            <ModernTabIcon
+              iconName="notifications"
+              size={size}
+              focused={focused}
+              color={color}
+              label="Alerts"
             />
           ),
         }}

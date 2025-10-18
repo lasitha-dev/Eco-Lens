@@ -22,6 +22,7 @@ import {
   Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
 import CartToast from '../../components/CartToast';
@@ -610,6 +611,12 @@ const CustomerDashboard = ({ navigation }) => {
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity 
+              style={styles.notificationIcon}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#005257" />
+            </TouchableOpacity>
+            <TouchableOpacity 
               style={styles.debugButton}
               onPress={() => setShowAuthDebugger(true)}
             >
@@ -843,6 +850,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   debugButton: {
