@@ -16,6 +16,8 @@ const { authenticateToken } = require('./middleware/auth');
 const surveyRoutes = require('./routes/surveyRoutes');
 const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
 const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const WeeklySummaryScheduler = require('./services/WeeklySummaryScheduler');
 const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
@@ -27,16 +29,32 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || '78
 const client = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 // Middleware
+// Allow all origins in development for easier testing
 app.use(cors({
-  origin: [
-    'http://localhost:8081',  // Expo dev server
-    'http://localhost:19006', // Expo web
-    'http://localhost:5002',  // Backend itself
-    'http://10.38.245.146:8081', // Mobile network IP
-    'http://10.38.245.146:19006', // Web network IP
-    'https://auth.expo.io', // Expo auth proxy
-    'eco-lens://oauth/redirect' // Custom scheme for mobile OAuth
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    // In production, use whitelist
+    const allowedOrigins = [
+      'http://localhost:8081',
+      'http://localhost:19006',
+      'http://localhost:5002',
+      'https://auth.expo.io',
+      'eco-lens://oauth/redirect'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 }));
@@ -73,6 +91,9 @@ mongoose.connect(MONGODB_URI, {
   
   // Seed admin user if not exists
   await seedAdminUser();
+  
+  // Start weekly summary scheduler
+  WeeklySummaryScheduler.start();
 })
 .catch(err => {
   console.error('❌ MongoDB connection error:', err.message);
@@ -753,6 +774,9 @@ app.use('/api/search', searchAnalyticsRoutes);
 
 // Dynamic Recommendation Routes
 app.use('/api/dynamic', dynamicRecommendationRoutes);
+
+// Notification Routes
+app.use('/api/notifications', notificationRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

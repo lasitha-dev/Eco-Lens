@@ -78,6 +78,14 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product'
   }],
+  weeklySummaryOptIn: {
+    type: Boolean,
+    default: true
+  },
+  expoPushToken: {
+    type: String,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
