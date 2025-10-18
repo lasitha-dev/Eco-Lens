@@ -50,7 +50,7 @@ const GoalCriteriaChip = ({
 
   // Get goal type icon
   const getGoalIcon = () => {
-    if (!goal?.goalType) return 'target-outline';
+    if (!goal?.goalType) return 'flag-outline';
     
     switch (goal.goalType) {
       case 'grade_based':
@@ -60,7 +60,7 @@ const GoalCriteriaChip = ({
       case 'category_based':
         return 'list-outline';
       default:
-        return 'target-outline';
+        return 'flag-outline';
     }
   };
 

@@ -40,6 +40,12 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   const refreshIntervalRef = useRef(null);
   const isUpdatingRef = useRef(false);
   const mountedRef = useRef(true);
+  const goalsRef = useRef(goals); // Track current goals without causing re-renders
+  
+  // Keep goalsRef in sync with goals state
+  useEffect(() => {
+    goalsRef.current = goals;
+  }, [goals]);
 
   /**
    * Load goals from cache with enhanced storage manager integration
@@ -93,7 +99,13 @@ export const useRealtimeGoalUpdates = (options = {}) => {
    * Fetch goals from API with optimistic updates and enhanced sync integration
    */
   const fetchGoals = useCallback(async (useCache = true) => {
-    if (!token || isUpdatingRef.current) return;
+    // Early return if no token or already updating
+    if (!token || isUpdatingRef.current) {
+      if (!token) {
+        console.log('⚠️ Skipping goal fetch - no auth token available');
+      }
+      return;
+    }
 
     isUpdatingRef.current = true;
     setError(null);
@@ -103,14 +115,14 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       if (useCache) {
         const cached = await loadFromCache();
         if (cached && mountedRef.current) {
-          setGoals(cached.goals);
+          setGoals(Array.isArray(cached.goals) ? cached.goals : []);
           setGoalStats(cached.stats);
           setLastUpdate(cached.lastUpdate);
           console.log('⚡ Goals loaded from enhanced cache, fetching fresh data in background');
         }
       }
 
-      setLoading(!useCache || !goals.length); // Don't show loading if we have cached data
+      setLoading(!useCache || !goalsRef.current.length); // Don't show loading if we have cached data
 
       // Check if we should prefer local data (if syncing is in progress or offline)
       const syncStatus = goalSyncService.getSyncStatus();
@@ -118,7 +130,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
         console.log('📱 Offline mode - loading from local storage only');
         const localData = await GoalStorageManager.getGoals(false);
         if (localData.cached && mountedRef.current) {
-          setGoals(localData.data);
+          setGoals(Array.isArray(localData.data) ? localData.data : []);
           const statsData = await GoalStorageManager.getGoalStats();
           setGoalStats(statsData?.data || null);
           setLastUpdate(localData.timestamp);
@@ -128,22 +140,30 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       }
 
       // Fetch fresh data from server with memoized service calls
-      const [freshGoals, freshStats] = await Promise.all([
+      const [goalsResponse, freshStats] = await Promise.all([
         SustainabilityGoalService.getUserGoals(token),
         SustainabilityGoalService.getGoalStats(token),
       ]);
 
+      // Handle response - could be array or object with goals property
+      const freshGoals = Array.isArray(goalsResponse) 
+        ? goalsResponse 
+        : (goalsResponse?.goals || []);
+
       if (!mountedRef.current) return;
 
-      // Memoized goal comparison for performance
-      const previousGoalMap = useMemo(() => new Map(
-        goals.map(g => [g._id, g])
-      ), [goals]);
+      // Get current goals from ref (not from closure)
+      const currentGoals = goalsRef.current || [];
+
+      // Goal comparison for performance (using Map directly, not useMemo inside callback)
+      const previousGoalMap = new Map(
+        currentGoals.map(g => [g._id, g])
+      );
 
       // Check for newly achieved goals - optimized comparison
-      if (goals.length > 0 && onGoalAchieved) {
+      if (currentGoals.length > 0 && onGoalAchieved) {
         const previouslyAchieved = new Set(
-          goals.filter(g => g.isAchieved).map(g => g._id)
+          currentGoals.filter(g => g.isAchieved).map(g => g._id)
         );
         
         const newlyAchieved = freshGoals.filter(
@@ -156,7 +176,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       }
 
       // Check for progress updates - memoized for performance
-      if (goals.length > 0 && onProgressUpdate) {
+      if (currentGoals.length > 0 && onProgressUpdate) {
         const progressUpdates = freshGoals
           .map(freshGoal => {
             const oldGoal = previousGoalMap.get(freshGoal._id);
@@ -177,7 +197,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       }
 
       // Update state
-      setGoals(freshGoals);
+      setGoals(Array.isArray(freshGoals) ? freshGoals : []);
       setGoalStats(freshStats);
       setLastUpdate(Date.now());
       setLoading(false);
@@ -188,7 +208,17 @@ export const useRealtimeGoalUpdates = (options = {}) => {
       console.log(`📊 Goals updated: ${freshGoals.length} goals, ${freshStats?.activeGoals || 0} active`);
 
     } catch (err) {
-      console.error('Error fetching goals:', err);
+      // Check if it's an authentication error
+      const isAuthError = err.message?.includes('Invalid token') || 
+                          err.message?.includes('Unauthorized') || 
+                          err.message?.includes('Authentication');
+      
+      if (isAuthError) {
+        console.warn('⚠️ Authentication error - user may need to re-login');
+      } else {
+        console.error('Error fetching goals:', err);
+      }
+      
       if (mountedRef.current) {
         setError(err.message);
         setLoading(false);
@@ -197,7 +227,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
         const localData = await GoalStorageManager.getGoals(false);
         if (localData.cached) {
           console.log('📱 Loading fallback data from local storage');
-          setGoals(localData.data);
+          setGoals(Array.isArray(localData.data) ? localData.data : []);
           const statsData = await GoalStorageManager.getGoalStats();
           setGoalStats(statsData?.data || null);
         }
@@ -205,7 +235,8 @@ export const useRealtimeGoalUpdates = (options = {}) => {
     } finally {
       isUpdatingRef.current = false;
     }
-  }, [token, goals, loadFromCache, saveToCache, onGoalAchieved, onProgressUpdate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, loadFromCache, saveToCache, onGoalAchieved, onProgressUpdate]); // goals intentionally omitted to prevent infinite loop
 
   /**
    * Force refresh goals (bypass cache)
@@ -222,6 +253,12 @@ export const useRealtimeGoalUpdates = (options = {}) => {
 
     try {
       console.log('🛒 Tracking purchase progress for goals');
+      
+      // Ensure goals is an array
+      if (!Array.isArray(goals) || goals.length === 0) {
+        console.log('⚠️ No goals to update for purchase');
+        return;
+      }
       
       // Optimistically update goals based on purchase
       const updatedGoals = await Promise.all(
@@ -277,17 +314,17 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   /**
    * Get active goals only - memoized for performance
    */
-  const activeGoals = useMemo(() => goals.filter(goal => goal.isActive), [goals]);
+  const activeGoals = useMemo(() => (goals || []).filter(goal => goal.isActive), [goals]);
 
   /**
    * Get achieved goals only - memoized for performance
    */
-  const achievedGoals = useMemo(() => goals.filter(goal => goal.isAchieved), [goals]);
+  const achievedGoals = useMemo(() => (goals || []).filter(goal => goal.isAchieved), [goals]);
 
   /**
    * Check if any goals are close to achievement (>80% progress) - memoized
    */
-  const goalsNearCompletion = useMemo(() => goals.filter(goal => 
+  const goalsNearCompletion = useMemo(() => (goals || []).filter(goal => 
     !goal.isAchieved && goal.progress?.currentPercentage >= 80
   ), [goals]);
 
@@ -310,7 +347,8 @@ export const useRealtimeGoalUpdates = (options = {}) => {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [autoRefresh, token, refreshInterval, fetchGoals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, token, refreshInterval]); // fetchGoals intentionally omitted to prevent infinite loop
 
   // Handle app state changes (refresh when app becomes active)
   useEffect(() => {
@@ -323,7 +361,8 @@ export const useRealtimeGoalUpdates = (options = {}) => {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [token, fetchGoals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]); // fetchGoals intentionally omitted to prevent infinite loop
 
   // Cleanup on unmount
   useEffect(() => {

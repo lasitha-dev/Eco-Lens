@@ -29,6 +29,17 @@ class GoalSyncService {
    * Initialize the sync service
    */
   async init(userId, token) {
+    // Validate inputs
+    if (!userId) {
+      console.warn('⚠️ GoalSyncService.init called without userId');
+      return;
+    }
+    
+    if (!token || token.length < 20) {
+      console.warn('⚠️ GoalSyncService.init called with invalid token - skipping initialization');
+      return;
+    }
+    
     this.userId = userId;
     this.token = token;
     
@@ -58,6 +69,19 @@ class GoalSyncService {
   }
 
   /**
+   * Update token (useful when token refreshes)
+   */
+  updateToken(token) {
+    if (!token || token.length < 20) {
+      console.warn('⚠️ Attempted to update with invalid token');
+      return false;
+    }
+    this.token = token;
+    console.log('🔑 Token updated in GoalSyncService');
+    return true;
+  }
+
+  /**
    * Initialize network monitoring
    */
   initNetworkMonitoring() {
@@ -66,8 +90,13 @@ class GoalSyncService {
       this.isOnline = state.isConnected && state.isInternetReachable;
 
       if (!wasOnline && this.isOnline) {
-        console.log('📡 Network restored - triggering sync');
-        this.onNetworkRestored();
+        console.log('📡 Network restored');
+        // Only trigger sync if we have a valid token
+        if (this.token && this.token.length >= 20) {
+          this.onNetworkRestored();
+        } else {
+          console.log('⚠️ Skipping sync on network restore - invalid token');
+        }
       } else if (wasOnline && !this.isOnline) {
         console.log('📡 Network lost - entering offline mode');
         this.onNetworkLost();
@@ -96,6 +125,12 @@ class GoalSyncService {
    * Perform complete synchronization
    */
   async performSync(force = false) {
+    // Validate token before syncing
+    if (!this.token || this.token.length < 20) {
+      console.log('⚠️ Skipping sync - invalid or missing token');
+      return { success: false, reason: 'invalid_token' };
+    }
+    
     if (this.isSyncing && !force) {
       console.log('🔄 Sync already in progress');
       return { success: false, reason: 'already_syncing' };
@@ -144,7 +179,19 @@ class GoalSyncService {
     } catch (error) {
       console.error('❌ Sync failed:', error);
       
-      // Retry logic
+      // Don't retry if it's a token error
+      const isAuthError = error.message?.includes('Invalid token') || 
+                          error.message?.includes('Unauthorized') || 
+                          error.message?.includes('Authentication');
+      
+      if (isAuthError) {
+        console.warn('⚠️ Authentication error - stopping retry attempts');
+        this.retryCount = 0;
+        this.notifyListeners('syncError', { error: 'Authentication required', requiresReauth: true });
+        return { success: false, error: error.message, requiresReauth: true };
+      }
+      
+      // Retry logic for non-auth errors
       if (this.retryCount < this.maxRetries) {
         this.retryCount++;
         console.log(`🔄 Retrying sync (${this.retryCount}/${this.maxRetries})`);
@@ -244,6 +291,11 @@ class GoalSyncService {
    * Sync data from server
    */
   async syncFromServer() {
+    // Validate token before API calls
+    if (!this.token || this.token.length < 20) {
+      throw new Error('Invalid token - cannot fetch from server');
+    }
+    
     console.log('📥 Fetching latest data from server');
 
     try {

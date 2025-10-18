@@ -41,8 +41,11 @@ class GoalStorageManager {
    */
   static async storeGoals(goals, fromServer = false) {
     try {
+      // Ensure goals is an array
+      const goalsArray = Array.isArray(goals) ? goals : [];
+      
       const storageData = {
-        data: goals,
+        data: goalsArray,
         timestamp: Date.now(),
         fromServer,
         version: Date.now(), // Simple versioning
@@ -53,7 +56,7 @@ class GoalStorageManager {
         JSON.stringify(storageData)
       );
 
-      console.log('✅ Goals stored locally:', goals.length, 'items');
+      console.log('✅ Goals stored locally:', goalsArray.length, 'items');
       return true;
     } catch (error) {
       console.error('❌ Failed to store goals:', error);
