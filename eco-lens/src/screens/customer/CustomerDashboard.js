@@ -36,6 +36,7 @@ import CartService from '../../api/cartService';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import GoalProgressCard from '../../components/goals/GoalProgressCard';
 import GoalIndicatorLegend from '../../components/goals/GoalIndicatorLegend';
+import FloatingGoalsButton from '../../components/goals/FloatingGoalsButton';
 import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
@@ -50,6 +51,7 @@ const CustomerDashboard = ({ navigation }) => {
   
   // Use real-time goals context instead of manual state management
   const {
+    goals,
     activeGoals,
     goalStats,
     loading: goalsLoading,
@@ -89,6 +91,76 @@ const CustomerDashboard = ({ navigation }) => {
   // Goal indicator legend state
   const [showGoalLegend, setShowGoalLegend] = useState(false);
 
+  // Get products to display based on current view
+  const getDisplayProducts = () => {
+    console.log('getDisplayProducts called:');
+    console.log('- showPersonalized:', showPersonalized);
+    console.log('- surveyCompleted:', surveyCompleted);
+    console.log('- personalizedProducts.length:', personalizedProducts.length);
+    console.log('- products.length:', products.length);
+    
+    if (showPersonalized && personalizedProducts.length > 0) {
+      console.log('Returning personalized products');
+      return personalizedProducts;
+    }
+    
+    if (surveyCompleted && personalizedProducts.length === 0) {
+      console.log('Survey completed but no personalized products yet, returning all products');
+    }
+    
+    console.log('Returning all products');
+    return products;
+  };
+
+  // Compute filtered products based on search, category, and filters
+  const filteredProducts = useMemo(() => {
+    console.log('filteredProducts recalculating...');
+    let filtered = getDisplayProducts();
+    
+    console.log('Initial filtered count:', filtered.length);
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.name?.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query) ||
+        product.category?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+
+    // Apply preset filters
+    if (selectedFilter && FILTER_PRESETS[selectedFilter]) {
+      const preset = FILTER_PRESETS[selectedFilter];
+      filtered = filtered.filter(product => {
+        if (preset.minScore && product.sustainabilityScore < preset.minScore) return false;
+        if (preset.grades && !preset.grades.includes(product.sustainabilityGrade)) return false;
+        if (preset.categories && !preset.categories.includes(product.category)) return false;
+        return true;
+      });
+    }
+
+    console.log('Final filtered count:', filtered.length);
+    return filtered;
+  }, [products, personalizedProducts, showPersonalized, surveyCompleted, searchQuery, selectedCategory, selectedFilter]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    Promise.all([
+      loadProducts(false),
+      loadPersonalizedRecommendations(),
+      refreshGoals()
+    ]).finally(() => {
+      setIsRefreshing(false);
+    });
+  }, []);
+
   // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
     setSelectedProduct(product);
@@ -125,36 +197,40 @@ const CustomerDashboard = ({ navigation }) => {
     setShowCartToast(true);
     setIsModalVisible(false);
 
-    // Track add to cart with dynamic recommendations
-    try {
-      await DynamicRecommendationService.trackAddToCart(product.id, quantity, 'search');
-      console.log('✅ Add to cart tracked with dynamic updates');
-      console.log(`🛒 Added to cart: ${quantity}x ${product.name} (${product.category}) - Grade: ${product.sustainabilityGrade}`);
-      
-      // Refresh personalized recommendations after tracking
-      await refreshPersonalizedRecommendations();
-    } catch (error) {
-      console.error('Error tracking add to cart with dynamic system:', error);
-      // Don't fail the add to cart, just log the error
-    }
+    console.log(`🛒 Adding to cart: ${quantity}x ${product.name}`);
 
-    try {
-      // Make API call in background
-      const response = await CartService.addToCart(product.id || product._id, quantity, auth);
-      
-      if (!response.success) {
-        // If failed, show error and hide toast
+    // Add to cart API call (critical path - must complete)
+    const addToCartPromise = CartService.addToCart(product.id || product._id, quantity, auth)
+      .then(response => {
+        if (!response.success) {
+          setShowCartToast(false);
+          Alert.alert('Error', response.error || 'Failed to add item to cart');
+          return false;
+        }
+        console.log('✅ Item added to cart successfully');
+        return true;
+      })
+      .catch(error => {
+        console.error('Error adding to cart:', error);
         setShowCartToast(false);
-        Alert.alert('Error', response.error || 'Failed to add item to cart');
-      }
-      // Success - toast already showing, no need to do anything
-    } catch (error) {
-      // If error, show error and hide toast
-      console.error('Error adding to cart:', error);
-      setShowCartToast(false);
-      Alert.alert('Error', 'Failed to add item to cart. Please try again.');
-    }
-  }, [auth, navigation]);
+        Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+        return false;
+      });
+
+    // Track in background (non-blocking - fire and forget)
+    DynamicRecommendationService.trackAddToCart(product.id, quantity, 'search')
+      .then(() => {
+        console.log('✅ Add to cart tracked');
+        // Refresh recommendations in background
+        refreshPersonalizedRecommendations().catch(err => 
+          console.warn('Failed to refresh recommendations:', err)
+        );
+      })
+      .catch(error => console.warn('Tracking failed:', error));
+
+    // Wait only for the critical cart operation
+    await addToCartPromise;
+  }, [auth, refreshPersonalizedRecommendations]);
 
   // Load products and personalized recommendations on component mount
   useEffect(() => {
@@ -453,144 +529,6 @@ const CustomerDashboard = ({ navigation }) => {
   }, [searchQuery, selectedCategory, selectedSort]);
 
   // Render sustainability goals header component
-  const renderGoalsHeader = useCallback(() => {
-    if (activeGoals.length === 0 && !goalsLoading) return null;
-
-    return (
-      <View style={styles.goalsContainer}>
-        <View style={styles.goalsHeaderRow}>
-          <View style={styles.goalsHeaderLeft}>
-            <View style={styles.goalsTitleRow}>
-              <Text style={styles.goalsTitle}>🎯 Your Sustainability Goals</Text>
-              {hasActiveGoals && (
-                <TouchableOpacity 
-                  style={styles.goalHelpButton}
-                  onPress={() => setShowGoalLegend(true)}
-                >
-                  <Ionicons name="help-circle-outline" size={16} color={theme.colors.primary} />
-                </TouchableOpacity>
-              )}
-            </View>
-            {goalStats && (
-              <Text style={styles.goalsSubtitle}>
-                {goalStats.activeGoals} active • {goalStats.achievedGoals} achieved
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity 
-            style={styles.goalsViewAllButton}
-            onPress={() => navigation.navigate('SustainabilityGoals')}
-          >
-            <Text style={styles.goalsViewAllText}>View All</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {goalsLoading ? (
-          <View style={styles.goalsLoadingContainer}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={styles.goalsLoadingText}>Loading goals...</Text>
-          </View>
-        ) : (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.goalsScrollView}
-            contentContainerStyle={styles.goalsScrollContent}
-          >
-            {activeGoals.map((goal) => (
-              <GoalProgressCard
-                key={goal._id}
-                goal={goal}
-                size="medium"
-                onPress={() => navigation.navigate('GoalProgress', { goal })}
-                style={styles.goalCardSpacing}
-              />
-            ))}
-
-            {/* Add new goal card */}
-            <TouchableOpacity
-              style={[styles.goalCard, styles.addGoalCard]}
-              onPress={() => navigation.navigate('GoalSetup', { mode: 'create' })}
-              activeOpacity={0.7}
-            >
-              <View style={styles.addGoalContent}>
-                <Ionicons name="add-circle" size={32} color={theme.colors.primary} />
-                <Text style={styles.addGoalText}>Add New Goal</Text>
-                <Text style={styles.addGoalSubtext}>Set a sustainability target</Text>
-              </View>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-      </View>
-    );
-  }, [activeGoals, goalStats, goalsLoading, navigation]);
-
-  // Helper functions for goal display
-  const getGoalTypeColor = (goalType) => {
-    const colors = {
-      'grade-based': theme.colors.primary,
-      'score-based': theme.colors.info,
-      'category-based': theme.colors.secondary,
-    };
-    return colors[goalType] || theme.colors.textSecondary;
-  };
-
-  const getGoalTypeLabel = (goalType) => {
-    const labels = {
-      'grade-based': 'Grade',
-      'score-based': 'Score', 
-      'category-based': 'Category',
-    };
-    return labels[goalType] || 'Custom';
-  };
-
-  // Get products to display based on current view
-  const getDisplayProducts = () => {
-    console.log('getDisplayProducts called:');
-    console.log('- showPersonalized:', showPersonalized);
-    console.log('- surveyCompleted:', surveyCompleted);
-    console.log('- personalizedProducts.length:', personalizedProducts.length);
-    console.log('- products.length:', products.length);
-    
-    if (showPersonalized && surveyCompleted) {
-      if (personalizedProducts.length > 0) {
-        console.log('Returning personalized products');
-        return personalizedProducts;
-      } else {
-        console.log('Survey completed but no personalized products yet, returning all products');
-        return products;
-      }
-    }
-    console.log('Returning all products');
-    return products;
-  };
-
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    loadProducts(false);
-    loadPersonalizedRecommendations();
-    refreshGoals(); // Use real-time goals refresh
-  }, [refreshGoals]);
-
-  // Filter products locally (API handles sorting)
-  const filteredProducts = useMemo(() => {
-    console.log('filteredProducts recalculating...');
-    let filtered = [...getDisplayProducts()];
-    console.log('Initial filtered count:', filtered.length);
-
-    // Apply preset filter (API doesn't handle these custom filters)
-    if (selectedFilter) {
-      filtered = FILTER_PRESETS[selectedFilter].filter(filtered);
-      console.log('After filter applied:', filtered.length);
-    }
-
-    console.log('Final filtered count:', filtered.length);
-    return filtered;
-  }, [products, selectedFilter, showPersonalized, surveyCompleted, personalizedProducts]);
-
-  // Render filters header component (categories, filters, controls)
   const renderFiltersHeader = useCallback(() => (
     <View style={styles.filtersContainer}>
       {/* Categories */}
@@ -878,7 +816,6 @@ const CustomerDashboard = ({ navigation }) => {
         contentContainerStyle={styles.productList}
         ListHeaderComponent={() => (
           <>
-            {renderGoalsHeader()}
             {renderFiltersHeader()}
           </>
         )}
@@ -924,6 +861,16 @@ const CustomerDashboard = ({ navigation }) => {
       <GoalIndicatorLegend
         visible={showGoalLegend}
         onClose={() => setShowGoalLegend(false)}
+      />
+
+      {/* Floating Goals Button */}
+      <FloatingGoalsButton
+        goals={goals}
+        goalStats={goalStats}
+        loading={goalsLoading}
+        onViewAllPress={() => navigation.navigate('SustainabilityGoals')}
+        onGoalPress={(goal) => navigation.navigate('GoalProgress', { goal })}
+        onAddGoalPress={() => navigation.navigate('GoalSetup', { mode: 'create' })}
       />
     </SafeAreaView>
   );

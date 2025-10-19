@@ -185,13 +185,15 @@ const SustainabilityGoalsScreen = ({ navigation }) => {
 
   // Render goal card
   const renderGoalCard = ({ item: goal }) => {
+    // Safely access progress data with defaults
+    const progress = goal.progress || { currentPercentage: 0, goalMetPurchases: 0, totalPurchases: 0 };
     const progressColor = SustainabilityGoalService.getGoalProgressColor(
-      goal.progress.currentPercentage, 
-      goal.goalConfig.percentage
+      progress.currentPercentage, 
+      goal.goalConfig?.percentage || 100
     );
     const progressStatus = SustainabilityGoalService.getGoalProgressStatus(
-      goal.progress.currentPercentage, 
-      goal.goalConfig.percentage
+      progress.currentPercentage, 
+      goal.goalConfig?.percentage || 100
     );
 
     return (
@@ -245,7 +247,7 @@ const SustainabilityGoalsScreen = ({ navigation }) => {
         <View style={styles.progressSection}>
           <View style={styles.progressInfo}>
             <Text style={styles.progressText}>
-              {goal.progress.currentPercentage}% of {goal.goalConfig.percentage}% target
+              {progress.currentPercentage?.toFixed(1) || 0}% of {goal.goalConfig?.percentage || 100}% target
             </Text>
             <Text style={[styles.progressStatus, { color: progressColor }]}>
               {progressStatus}
@@ -259,14 +261,14 @@ const SustainabilityGoalsScreen = ({ navigation }) => {
                 style={[
                   styles.progressBarFill, 
                   { 
-                    width: `${Math.min(goal.progress.currentPercentage / goal.goalConfig.percentage * 100, 100)}%`,
+                    width: `${Math.min((progress.currentPercentage / (goal.goalConfig?.percentage || 100)) * 100, 100)}%`,
                     backgroundColor: progressColor 
                   }
                 ]} 
               />
             </View>
             <Text style={styles.progressPercentage}>
-              {Math.round(goal.progress.currentPercentage / goal.goalConfig.percentage * 100)}%
+              {Math.round((progress.currentPercentage / (goal.goalConfig?.percentage || 100)) * 100)}%
             </Text>
           </View>
         </View>
@@ -277,12 +279,12 @@ const SustainabilityGoalsScreen = ({ navigation }) => {
             {goal.description || SustainabilityGoalService.generateGoalDescription(goal.goalType, goal.goalConfig)}
           </Text>
           <Text style={styles.goalStats}>
-            {goal.progress.goalMetPurchases} of {goal.progress.totalPurchases} purchases meet goal
+            {progress.goalMetPurchases || 0} of {progress.totalPurchases || 0} purchases meet goal
           </Text>
         </View>
 
         {/* Achievement Badge */}
-        {goal.progress.currentPercentage >= goal.goalConfig.percentage && (
+        {progress.currentPercentage >= (goal.goalConfig?.percentage || 100) && (
           <View style={styles.achievementBadge}>
             <Ionicons name="trophy" size={16} color={theme.colors.accent} />
             <Text style={styles.achievementText}>Goal Achieved!</Text>

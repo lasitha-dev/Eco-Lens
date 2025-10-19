@@ -18,7 +18,7 @@ const CACHE_KEYS = {
   LAST_UPDATE: '@goals_last_update',
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - increased from 5 minutes to reduce unnecessary refreshes
 
 export const useRealtimeGoalUpdates = (options = {}) => {
   const {
@@ -41,6 +41,8 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   const isUpdatingRef = useRef(false);
   const mountedRef = useRef(true);
   const goalsRef = useRef(goals); // Track current goals without causing re-renders
+  const skipNextAutoRefreshRef = useRef(false); // Skip auto-refresh after optimistic updates
+  const lastOptimisticUpdateRef = useRef(0); // Track last optimistic update time
   
   // Keep goalsRef in sync with goals state
   useEffect(() => {
@@ -98,7 +100,17 @@ export const useRealtimeGoalUpdates = (options = {}) => {
   /**
    * Fetch goals from API with optimistic updates and enhanced sync integration
    */
-  const fetchGoals = useCallback(async (useCache = true) => {
+  const fetchGoals = useCallback(async (useCache = true, isAutoRefresh = false) => {
+    // Skip auto-refresh if we just did an optimistic update
+    if (isAutoRefresh && skipNextAutoRefreshRef.current) {
+      const timeSinceOptimisticUpdate = Date.now() - lastOptimisticUpdateRef.current;
+      if (timeSinceOptimisticUpdate < 5000) { // Skip for 5 seconds after optimistic update
+        console.log('⏭️ Skipping auto-refresh - recent optimistic update');
+        return;
+      }
+      skipNextAutoRefreshRef.current = false;
+    }
+    
     // Early return if no token or already updating
     if (!token || isUpdatingRef.current) {
       if (!token) {
@@ -300,11 +312,16 @@ export const useRealtimeGoalUpdates = (options = {}) => {
 
       // Update state with optimistic updates
       setGoals(updatedGoals);
+      
+      // Mark that we did an optimistic update
+      lastOptimisticUpdateRef.current = Date.now();
+      skipNextAutoRefreshRef.current = true;
 
-      // Schedule a refresh to get accurate data from the server
+      // Schedule a refresh to get accurate data from the server (increased delay)
       setTimeout(() => {
+        skipNextAutoRefreshRef.current = false; // Allow refresh now
         refreshGoals();
-      }, 2000);
+      }, 5000); // Increased from 2s to 5s to give server time to process
 
     } catch (error) {
       console.error('Error tracking purchase progress:', error);
@@ -338,7 +355,7 @@ export const useRealtimeGoalUpdates = (options = {}) => {
     // Setup interval
     if (refreshInterval > 0) {
       refreshIntervalRef.current = setInterval(() => {
-        fetchGoals(true);
+        fetchGoals(true, true); // Pass isAutoRefresh = true
       }, refreshInterval);
     }
 

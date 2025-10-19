@@ -24,10 +24,12 @@ import { API_BASE_URL } from '../../config/api';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
 import PostPurchaseRatingManager from '../../components/PostPurchaseRatingManager';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 
 const PaymentReviewScreen = ({ route, navigation }) => {
   const { shippingAddress, cartItems, totalAmount, paymentDetails } = route.params;
   const { auth: token } = useAuth();
+  const { refreshGoals } = useRealtimeGoals(); // Add goal refresh capability
   const [processing, setProcessing] = useState(false);
   const [showRatingFlow, setShowRatingFlow] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
@@ -45,12 +47,26 @@ const PaymentReviewScreen = ({ route, navigation }) => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Check goal progress updates
-      const goalStats = await SustainabilityGoalService.getGoalStats();
-      const activeGoals = await SustainabilityGoalService.getUserGoals();
+      const goalStatsResponse = await SustainabilityGoalService.getGoalStats(token);
+      const activeGoalsResponse = await SustainabilityGoalService.getUserGoals(token);
+      
+      // Extract goals array (handle both array and object responses)
+      const activeGoals = Array.isArray(activeGoalsResponse) 
+        ? activeGoalsResponse 
+        : (activeGoalsResponse?.goals || []);
       
       // Check how many cart items met goals
-      const goalValidation = SustainabilityGoalService.checkProductMeetsGoals(cartItems, activeGoals);
-      const itemsMeetingGoals = goalValidation.filter(item => item.meetsAnyGoal).length;
+      let itemsMeetingGoals = 0;
+      if (activeGoals.length > 0) {
+        activeGoals.forEach(goal => {
+          cartItems.forEach(item => {
+            const result = SustainabilityGoalService.checkProductMeetsGoals(item, [goal]);
+            if (result.meetsAnyGoal) {
+              itemsMeetingGoals++;
+            }
+          });
+        });
+      }
       
       let successMessage = `Your order ${order.orderNumber} has been placed successfully! 🎉`;
       
@@ -166,9 +182,24 @@ const PaymentReviewScreen = ({ route, navigation }) => {
       const data = await response.json();
 
       if (data.success) {
-        // Payment successful - store order data and show rating flow
-        // Note: Goal tracking happens automatically in the backend
-        setCompletedOrder(data.order);
+        // Payment successful - track purchase against goals
+        const order = data.order;
+        setCompletedOrder(order);
+        
+        // Track purchase against sustainability goals
+        try {
+          console.log(`🎯 Tracking purchase for order: ${order._id}`);
+          await SustainabilityGoalService.trackPurchase(order._id, token);
+          console.log('✅ Purchase tracked successfully');
+          
+          // Refresh goals to get updated progress
+          await refreshGoals();
+        } catch (trackError) {
+          console.error('⚠️ Error tracking purchase:', trackError);
+          // Continue anyway - don't block the user flow
+        }
+        
+        // Show rating flow
         setShowRatingFlow(true);
       } else {
         Alert.alert('Payment Failed', data.error || 'Failed to process payment. Please try again.');
@@ -182,7 +213,15 @@ const PaymentReviewScreen = ({ route, navigation }) => {
   };
 
   // Handle rating flow completion
-  const handleRatingFlowComplete = () => {
+  const handleRatingFlowComplete = async () => {
+    setShowRatingFlow(false);
+    
+    // Show enhanced success message with goal updates
+    await showPaymentSuccessWithGoals(completedOrder);
+  };
+  
+  // Legacy alert handler (kept for reference)
+  const handleRatingFlowCompleteLegacy = () => {
     setShowRatingFlow(false);
     Alert.alert(
       'Thank You! 🎉',

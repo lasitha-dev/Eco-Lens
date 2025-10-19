@@ -15,7 +15,7 @@ const STORAGE_KEYS = {
   CACHE_METADATA: 'goalCacheMetadata',
 };
 
-const CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_EXPIRATION_MS = 60 * 60 * 1000; // 60 minutes (1 hour) - increased from 10 minutes to prevent premature data clearing
 const MAX_OFFLINE_CHANGES = 100;
 
 class GoalStorageManager {

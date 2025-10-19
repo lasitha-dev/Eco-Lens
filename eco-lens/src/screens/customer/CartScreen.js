@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -106,26 +107,13 @@ const CartScreen = ({ navigation }) => {
     }
   };
 
-  // Load active sustainability goals
-  const loadActiveGoals = async () => {
-    if (!token) return;
-
-    try {
-      const response = await SustainabilityGoalService.getUserGoals(token);
-      if (response.success) {
-        const active = response.goals.filter(goal => goal.isActive);
-        setActiveGoals(active);
-        console.log('✅ Loaded active goals for cart validation:', active.length);
-      }
-    } catch (error) {
-      console.error('Error loading goals for cart:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchCart();
-    // Goals are now automatically loaded by the RealtimeGoalProvider
-  }, []);
+  // Reload cart whenever screen is focused (fixes issue where added items don't show immediately)
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+      // Goals are now automatically loaded by the RealtimeGoalProvider
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

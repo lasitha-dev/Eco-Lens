@@ -7,17 +7,18 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
   SafeAreaView,
   StatusBar,
+  ScrollView,
   TouchableOpacity,
+  Animated,
+  RefreshControl,
   ActivityIndicator,
   Alert,
   Dimensions,
-  Platform,
-  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuthLogin';
@@ -37,20 +38,47 @@ const GoalProgressScreen = ({ route, navigation }) => {
   const [detailedProgress, setDetailedProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [previousProgress, setPreviousProgress] = useState(initialGoal?.progress?.currentPercentage || 0);
+  const [previousProgress, setPreviousProgress] = useState(0);
+  const [hasLoadedPreviousProgress, setHasLoadedPreviousProgress] = useState(false);
   
   // Animation values
   const progressAnimation = React.useRef(new Animated.Value(0)).current;
 
+  // Load previously seen progress on mount
   useEffect(() => {
-    fetchGoalProgress();
-  }, []);
+    const loadPreviousProgress = async () => {
+      try {
+        const key = `@goal_last_seen_progress_${goal._id}`;
+        const stored = await AsyncStorage.getItem(key);
+        if (stored !== null) {
+          setPreviousProgress(parseFloat(stored));
+        } else {
+          // First time viewing this goal - use current progress
+          setPreviousProgress(initialGoal?.progress?.currentPercentage || 0);
+        }
+        setHasLoadedPreviousProgress(true);
+      } catch (error) {
+        console.error('Error loading previous progress:', error);
+        setPreviousProgress(initialGoal?.progress?.currentPercentage || 0);
+        setHasLoadedPreviousProgress(true);
+      }
+    };
+    
+    loadPreviousProgress();
+  }, [goal._id]);
+  
+  // Fetch goal progress after loading previous progress
+  useEffect(() => {
+    if (hasLoadedPreviousProgress) {
+      fetchGoalProgress();
+    }
+  }, [hasLoadedPreviousProgress]);
 
   // Animate progress when data loads
   useEffect(() => {
     if (detailedProgress) {
       const targetProgress = Math.min(
-        detailedProgress.currentPercentage / goal.goalConfig.percentage, 
+        (detailedProgress.currentPercentage || 0) / (goal.goalConfig?.percentage || 100), 
         1
       );
       
@@ -65,21 +93,40 @@ const GoalProgressScreen = ({ route, navigation }) => {
 
   // Fetch detailed goal progress
   // Handle milestone detection when progress updates
-  const handleMilestoneReached = (milestone) => {
-    console.log(`🎯 Milestone reached: ${milestone}% for goal "${goal.title}"`);
+  const handleMilestoneReached = async (milestone) => {
+    const key = `@goal_milestone_shown_${goal._id}_${milestone}`;
     
-    // Trigger custom milestone achievement animation
-    if (triggerCustomAchievement) {
-      triggerCustomAchievement('milestone', goal, `You've reached ${milestone}% progress!`);
+    try {
+      // Check if we've already shown this milestone
+      const alreadyShown = await AsyncStorage.getItem(key);
+      
+      if (!alreadyShown) {
+        console.log(`🎯 Milestone reached: ${milestone}% for goal "${goal.title}"`);
+        
+        // Mark this milestone as shown
+        await AsyncStorage.setItem(key, 'true');
+        
+        // Trigger custom milestone achievement animation
+        if (triggerCustomAchievement) {
+          triggerCustomAchievement('milestone', goal, `You've reached ${milestone}% progress!`);
+        }
+      } else {
+        console.log(`✓ Milestone ${milestone}% already shown, skipping animation`);
+      }
+    } catch (error) {
+      console.error('Error checking milestone:', error);
     }
   };
 
   // Detect if progress has improved and trigger appropriate animations
-  const detectProgressImprovement = (newProgress) => {
+  const detectProgressImprovement = async (newProgress) => {
     const currentPercentage = newProgress?.currentPercentage || 0;
     
+    // Only trigger if progress actually improved since last view
     if (currentPercentage > previousProgress) {
       const improvement = currentPercentage - previousProgress;
+      
+      console.log(`📈 Progress improved by ${improvement.toFixed(1)}% (from ${previousProgress}% to ${currentPercentage}%)`);
       
       // Check for significant improvements (>= 10%)
       if (improvement >= 10) {
@@ -92,8 +139,17 @@ const GoalProgressScreen = ({ route, navigation }) => {
         }, 1000);
       }
       
-      // Update previous progress
+      // Update and persist the new progress
       setPreviousProgress(currentPercentage);
+      try {
+        const key = `@goal_last_seen_progress_${goal._id}`;
+        await AsyncStorage.setItem(key, currentPercentage.toString());
+        console.log(`💾 Saved last seen progress: ${currentPercentage}%`);
+      } catch (error) {
+        console.error('Error saving progress:', error);
+      }
+    } else {
+      console.log(`✓ Progress unchanged (${currentPercentage}%), no animation triggered`);
     }
   };
 
@@ -143,7 +199,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
   const getProgressColor = () => {
     return SustainabilityGoalService.getGoalProgressColor(
       detailedProgress?.currentPercentage || 0,
-      goal.goalConfig.percentage
+      goal.goalConfig?.percentage || 100
     );
   };
 
@@ -151,7 +207,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
   const getProgressStatus = () => {
     return SustainabilityGoalService.getGoalProgressStatus(
       detailedProgress?.currentPercentage || 0,
-      goal.goalConfig.percentage
+      goal.goalConfig?.percentage || 100
     );
   };
 
@@ -208,8 +264,8 @@ const GoalProgressScreen = ({ route, navigation }) => {
   const renderProgressCircle = () => {
     if (!detailedProgress) return null;
 
-    const currentProgress = detailedProgress.currentPercentage || 0;
-    const targetProgress = goal.goalConfig.percentage || 100;
+    const currentProgress = detailedProgress?.currentPercentage || 0;
+    const targetProgress = goal.goalConfig?.percentage || 100;
     const progressPercentage = Math.min((currentProgress / targetProgress) * 100, 100);
 
     return (
@@ -234,21 +290,21 @@ const GoalProgressScreen = ({ route, navigation }) => {
           <View style={styles.progressStats}>
             <View style={styles.progressStat}>
               <Text style={styles.progressStatNumber}>
-                {detailedProgress.goalMetPurchases}
+                {detailedProgress?.goalMetPurchases || 0}
               </Text>
               <Text style={styles.progressStatLabel}>Goal Met</Text>
             </View>
             
             <View style={styles.progressStat}>
               <Text style={styles.progressStatNumber}>
-                {detailedProgress.totalPurchases}
+                {detailedProgress?.totalPurchases || 0}
               </Text>
               <Text style={styles.progressStatLabel}>Total Purchases</Text>
             </View>
             
             <View style={styles.progressStat}>
               <Text style={[styles.progressStatNumber, { color: getProgressColor() }]}>
-                {goal.goalConfig.percentage}%
+                {goal.goalConfig?.percentage || 100}%
               </Text>
               <Text style={styles.progressStatLabel}>Target</Text>
             </View>
@@ -268,9 +324,9 @@ const GoalProgressScreen = ({ route, navigation }) => {
             </Text>
           </View>
           <Text style={styles.progressStatusDescription}>
-            {detailedProgress.isAchieved 
+            {detailedProgress?.isAchieved 
               ? "Congratulations! You've achieved your sustainability goal! 🎉"
-              : `You need ${Math.max(0, Math.ceil((goal.goalConfig.percentage - detailedProgress.currentPercentage) / 100 * detailedProgress.totalPurchases))} more goal-meeting purchases to achieve your target.`
+              : `You need ${Math.max(0, Math.ceil(((goal.goalConfig?.percentage || 100) - (detailedProgress?.currentPercentage || 0)) / 100 * (detailedProgress?.totalPurchases || 0)))} more goal-meeting purchases to achieve your target.`
             }
           </Text>
         </View>
@@ -288,7 +344,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
           <View style={styles.configItem}>
             <Text style={styles.configLabel}>Target Grades</Text>
             <View style={styles.gradeList}>
-              {goal.goalConfig.targetGrades.map((grade) => {
+              {(goal.goalConfig?.targetGrades || []).map((grade) => {
                 const gradeStyle = theme.getEcoGradeStyles(grade);
                 return (
                   <View
@@ -312,7 +368,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
           <View style={styles.configItem}>
             <Text style={styles.configLabel}>Minimum Score</Text>
             <Text style={styles.configValue}>
-              {goal.goalConfig.minimumScore}+ sustainability score
+              {goal.goalConfig?.minimumScore || 0}+ sustainability score
             </Text>
           </View>
         )}
@@ -322,7 +378,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
             <View style={styles.configItem}>
               <Text style={styles.configLabel}>Categories</Text>
               <View style={styles.categoryList}>
-                {goal.goalConfig.categories.map((category) => (
+                {(goal.goalConfig?.categories || []).map((category) => (
                   <View key={category} style={styles.categoryBadge}>
                     <Text style={styles.categoryBadgeText}>{category}</Text>
                   </View>
@@ -332,7 +388,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
             <View style={styles.configItem}>
               <Text style={styles.configLabel}>Target Grades</Text>
               <View style={styles.gradeList}>
-                {goal.goalConfig.targetGrades.map((grade) => {
+                {(goal.goalConfig?.targetGrades || []).map((grade) => {
                   const gradeStyle = theme.getEcoGradeStyles(grade);
                   return (
                     <View
@@ -356,7 +412,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
         <View style={styles.configItem}>
           <Text style={styles.configLabel}>Target Percentage</Text>
           <Text style={styles.configValue}>
-            {goal.goalConfig.percentage}% of purchases should meet goal
+            {goal.goalConfig?.percentage || 100}% of purchases should meet goal
           </Text>
         </View>
       </View>
@@ -444,7 +500,7 @@ const GoalProgressScreen = ({ route, navigation }) => {
   };
 
   // Show loading state
-  if (loading) {
+  if (loading || !hasLoadedPreviousProgress) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />

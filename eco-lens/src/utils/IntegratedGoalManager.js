@@ -53,7 +53,7 @@ class IntegratedOfflineGoalManager {
       case 'syncComplete':
         this.notifyListeners('syncComplete', data);
         // Clear successful operations from queue
-        this.clearProcessedoperations(data);
+        this.clearProcessedOperations(data);
         break;
       
       case 'syncError':

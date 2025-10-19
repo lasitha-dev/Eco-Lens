@@ -28,6 +28,10 @@ class CartService {
   // Add item to cart
   static async addToCart(productId, quantity, token) {
     try {
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${API_BASE_URL}/cart/add`, {
         method: 'POST',
         headers: {
@@ -38,11 +42,17 @@ class CartService {
           productId,
           quantity,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
       return data;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Add to cart request timed out');
+        throw new Error('Request timed out. Please check your connection.');
+      }
       console.error('Error adding to cart:', error);
       throw error;
     }

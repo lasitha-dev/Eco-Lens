@@ -139,21 +139,14 @@ const AnimatedProgressBar = ({
       {/* Progress percentage */}
       {showPercentage && (
         <View style={styles.percentageContainer}>
-          <Animated.Text
+          <Text
             style={[
               styles.percentageText,
               { color: progressColor }
             ]}
           >
-            {progressAnim.interpolate({
-              inputRange: [0, 100],
-              outputRange: [0, progressPercentage],
-              extrapolate: 'clamp',
-            }).interpolate({
-              inputRange: [0, 100],
-              outputRange: ['0%', `${progressPercentage.toFixed(1)}%`],
-            })}
-          </Animated.Text>
+            {progressPercentage.toFixed(1)}%
+          </Text>
           <Text style={styles.targetText}>/ {targetProgress}%</Text>
         </View>
       )}

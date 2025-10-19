@@ -26,6 +26,9 @@ class MemoizedSustainabilityGoalService {
     
     // Request deduplication cache
     this.pendingRequests = new Map();
+    
+    // Debug flag - set to true to enable verbose logging
+    this.debug = false;
   }
 
   /**
@@ -89,18 +92,18 @@ class MemoizedSustainabilityGoalService {
       // Check cache first
       const cachedResult = this.getFromCache(cacheKey);
       if (cachedResult) {
-        console.log(`📋 Cache hit for ${methodName}`);
+        if (this.debug) console.log(`📋 Cache hit for ${methodName}`);
         return cachedResult;
       }
 
       // Check for pending request (deduplication)
       if (this.pendingRequests.has(cacheKey)) {
-        console.log(`⏳ Deduplicating request for ${methodName}`);
+        if (this.debug) console.log(`⏳ Deduplicating request for ${methodName}`);
         return await this.pendingRequests.get(cacheKey);
       }
 
       // Execute method and cache result
-      console.log(`🌐 Cache miss for ${methodName} - fetching from API`);
+      if (this.debug) console.log(`🌐 Cache miss for ${methodName} - fetching from API`);
       const requestPromise = originalMethod.apply(SustainabilityGoalService, args);
       this.pendingRequests.set(cacheKey, requestPromise);
 
@@ -171,7 +174,7 @@ class MemoizedSustainabilityGoalService {
       }
     });
 
-    console.log('✅ MemoizedSustainabilityGoalService initialized');
+    if (this.debug) console.log('✅ MemoizedSustainabilityGoalService initialized');
   }
 
   /**
@@ -198,7 +201,7 @@ class MemoizedSustainabilityGoalService {
       }
     });
 
-    if (invalidatedCount > 0) {
+    if (invalidatedCount > 0 && this.debug) {
       console.log(`🧹 Invalidated ${invalidatedCount} cache entries for ${writeMethod}`);
     }
   }
@@ -315,7 +318,7 @@ class MemoizedSustainabilityGoalService {
     this.cacheExpiration.clear();
     this.pendingRequests.clear();
     
-    console.log(`🧹 Cleared cache: ${size} entries removed`);
+    if (this.debug) console.log(`🧹 Cleared cache: ${size} entries removed`);
     
     // Reset stats
     this.cacheStats = {
@@ -347,7 +350,7 @@ class MemoizedSustainabilityGoalService {
   async warmupCache(token) {
     if (!token) return;
 
-    console.log('🔥 Warming up cache...');
+    if (this.debug) console.log('🔥 Warming up cache...');
     
     try {
       // Pre-load frequently accessed data
@@ -356,10 +359,18 @@ class MemoizedSustainabilityGoalService {
         this.getGoalStats(token),
       ]);
       
-      console.log('✅ Cache warmed up successfully');
+      if (this.debug) console.log('✅ Cache warmed up successfully');
     } catch (error) {
       console.warn('⚠️ Cache warmup failed:', error);
     }
+  }
+
+  /**
+   * Enable or disable debug logging
+   */
+  setDebugMode(enabled) {
+    this.debug = enabled;
+    console.log(`🐛 Debug mode ${enabled ? 'enabled' : 'disabled'} for MemoizedSustainabilityGoalService`);
   }
 
   /**
@@ -373,6 +384,7 @@ class MemoizedSustainabilityGoalService {
       config: {
         maxCacheSize: this.maxCacheSize,
         defaultCacheDuration: this.defaultCacheDuration,
+        debug: this.debug,
       },
     };
   }

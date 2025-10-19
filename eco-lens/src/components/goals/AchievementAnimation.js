@@ -10,9 +10,9 @@ import {
   StyleSheet,
   Modal,
   Animated,
+  Easing,
   Dimensions,
   TouchableOpacity,
-  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -113,13 +113,13 @@ const AchievementAnimation = ({
         Animated.timing(scaleAnim, {
           toValue: 1.2,
           duration: 300,
-          easing: Easing.elastic(1.5),
+          easing: Easing.out(Easing.back(1.5)),
           useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 200,
-          easing: Easing.bounce,
+          easing: Easing.elastic(1),
           useNativeDriver: true,
         }),
       ]),

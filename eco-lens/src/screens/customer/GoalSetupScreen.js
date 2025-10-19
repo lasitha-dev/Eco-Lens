@@ -186,7 +186,8 @@ const GoalSetupScreen = ({ navigation, route }) => {
         goalType: formData.goalType,
         title: formData.title.trim(),
         description: formData.description.trim(),
-        goalConfig: formData.goalConfig
+        goalConfig: formData.goalConfig,
+        isActive: true // Ensure newly created goals are active by default
       };
 
       if (mode === 'create') {

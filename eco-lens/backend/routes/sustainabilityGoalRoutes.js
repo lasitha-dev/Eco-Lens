@@ -90,7 +90,8 @@ router.post('/', authenticateToken, async (req, res) => {
       goalType,
       goalConfig,
       title: title.trim(),
-      description: description ? description.trim() : ''
+      description: description ? description.trim() : '',
+      isActive: true
     });
     
     await newGoal.save();
@@ -202,8 +203,8 @@ router.get('/:id/progress', authenticateToken, async (req, res) => {
     
     // Get user's purchase history to calculate detailed progress
     const orders = await Order.find({ 
-      userId, 
-      status: 'completed' 
+      user: userId, 
+      paymentStatus: 'paid' 
     }).populate('items.product');
     
     let totalPurchases = 0;
@@ -275,7 +276,7 @@ router.post('/track-purchase', authenticateToken, async (req, res) => {
     // Get the order with products
     const order = await Order.findOne({ 
       _id: orderId, 
-      userId 
+      user: userId 
     }).populate('items.product');
     
     if (!order) {
@@ -302,8 +303,8 @@ router.post('/track-purchase', authenticateToken, async (req, res) => {
     for (const goal of activeGoals) {
       // Get all completed orders for this user
       const allOrders = await Order.find({ 
-        userId, 
-        status: 'completed' 
+        user: userId, 
+        paymentStatus: 'paid' 
       }).populate('items.product');
       
       let totalPurchases = 0;
