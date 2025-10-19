@@ -263,13 +263,23 @@ app.post('/api/register', async (req, res) => {
       console.log('⚠️  User saved to in-memory storage. Total users in memory:', inMemoryUsers.length);
     }
 
+    // Generate JWT token
+    const token = generateToken(newUser);
+
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'Registration successful',
+      token,
       user: {
         id: newUser._id,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         email: newUser.email,
+        address: newUser.address,
+        country: newUser.country,
+        phone: newUser.phone,
+        dateOfBirth: newUser.dateOfBirth,
+        gender: newUser.gender,
+        role: newUser.role || 'customer',
         profilePicture: newUser.profilePicture || null
       }
     });
@@ -322,6 +332,11 @@ app.post('/api/login', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        address: user.address,
+        country: user.country,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
         role: user.role || 'customer',
         profilePicture: user.profilePicture || null,
         fingerprintEnabled: user.fingerprintEnabled || false

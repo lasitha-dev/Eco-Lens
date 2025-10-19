@@ -440,6 +440,198 @@ class AuthService {
     }
   }
 
+  // Request password reset
+  static async requestPasswordReset(email) {
+    try {
+      console.log(`Requesting password reset for: ${email}`);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send reset email');
+      }
+
+      const data = await response.json();
+      console.log('✅ Password reset request successful');
+      return data;
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Verify reset token
+  static async verifyResetToken(token) {
+    try {
+      console.log('Verifying reset token...');
+      
+      const response = await fetch(`${API_BASE_URL}/auth/verify-reset-token?token=${token}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Invalid or expired token');
+      }
+
+      const data = await response.json();
+      console.log('✅ Reset token is valid');
+      return data;
+    } catch (error) {
+      console.error('Error verifying reset token:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Reset password with token
+  static async resetPassword(token, newPassword) {
+    try {
+      console.log('Resetting password with token...');
+
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reset password');
+      }
+
+      const data = await response.json();
+      console.log('✅ Password reset successful');
+      return data;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+
+      throw error;
+    }
+  }
+
+  // Get user profile
+  static async getUserProfile() {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      throw error;
+    }
+  }
+
+  // Fetch complete user profile from database
+  static async fetchUserProfile() {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      throw error;
+    }
+  }
+
+  // Update user profile
+  static async updateProfile(profileData) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(profileData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  }
+
+  // Update fingerprint setting
+  static async updateFingerprintSetting(fingerprintEnabled) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile/fingerprint-settings`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ fingerprintEnabled })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update fingerprint setting');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating fingerprint setting:', error);
+      throw error;
+    }
+  }
+
+  // Delete profile photo (duplicate removed)
+  // This was a duplicate, removed to avoid conflicts
+
 }
 
 export default AuthService;
