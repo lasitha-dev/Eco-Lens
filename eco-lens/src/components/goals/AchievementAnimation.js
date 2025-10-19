@@ -113,13 +113,13 @@ const AchievementAnimation = ({
         Animated.timing(scaleAnim, {
           toValue: 1.2,
           duration: 300,
-          easing: Easing.out(Easing.back(1.5)),
+          easing: Easing.bezier(0.68, -0.55, 0.265, 1.55),
           useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 200,
-          easing: Easing.elastic(1),
+          easing: Easing.bezier(0.68, -0.55, 0.265, 1.55),
           useNativeDriver: true,
         }),
       ]),
@@ -131,7 +131,7 @@ const AchievementAnimation = ({
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 400,
-        easing: Easing.out(Easing.cubic),
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start();
@@ -186,13 +186,13 @@ const AchievementAnimation = ({
           Animated.timing(anim.translateY, {
             toValue: data.endY,
             duration: 3000 + Math.random() * 2000,
-            easing: Easing.out(Easing.cubic),
+            easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(anim.translateX, {
             toValue: data.startX + (Math.random() - 0.5) * 100,
             duration: 3000 + Math.random() * 2000,
-            easing: Easing.inOut(Easing.sine),
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(anim.rotate, {

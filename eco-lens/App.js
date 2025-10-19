@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
 import { FavoritesProvider } from "./src/hooks/useFavorites";
 import { RealtimeGoalProvider } from "./src/contexts/RealtimeGoalContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
 import GlobalAnimationOverlay from "./src/components/GlobalAnimationOverlay";
 import AppNavigator from './src/navigation/AppNavigator';
 
@@ -43,15 +44,17 @@ const Navigation = () => {
   console.log('Linking prefixes:', linking.prefixes);
 
   return (
-    <FavoritesProvider> 
-      <RealtimeGoalProvider>
-        <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
-          <AppNavigator />
-          <StatusBar style="auto" />
-          <GlobalAnimationOverlay />
-        </NavigationContainer>
-      </RealtimeGoalProvider>
-    </FavoritesProvider>
+    <NotificationProvider>
+      <FavoritesProvider> 
+        <RealtimeGoalProvider>
+          <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
+            <AppNavigator />
+            <StatusBar style="auto" />
+            <GlobalAnimationOverlay />
+          </NavigationContainer>
+        </RealtimeGoalProvider>
+      </FavoritesProvider>
+    </NotificationProvider>
   );
 };
 

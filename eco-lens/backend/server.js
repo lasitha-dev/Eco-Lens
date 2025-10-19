@@ -18,6 +18,7 @@ const searchAnalyticsRoutes = require('./routes/searchAnalyticsRoutes');
 const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoutes');
 const sustainabilityGoalRoutes = require('./routes/sustainabilityGoalRoutes');
 const ratingRoutes = require('./routes/ratingRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 const PORT = process.env.PORT || 5002;
 
@@ -619,6 +620,9 @@ app.use('/api/goals', sustainabilityGoalRoutes);
 
 // Rating Routes
 app.use('/api/ratings', ratingRoutes);
+
+// Notification Routes
+app.use('/api/notifications', notificationRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

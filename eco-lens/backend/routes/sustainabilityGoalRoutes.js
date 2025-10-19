@@ -4,6 +4,7 @@ const SustainabilityGoal = require('../models/SustainabilityGoal');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { authenticateToken } = require('../middleware/auth');
+const NotificationHelper = require('../utils/notificationHelper');
 
 // Get user's sustainability goals
 router.get('/', authenticateToken, async (req, res) => {
@@ -201,10 +202,11 @@ router.get('/:id/progress', authenticateToken, async (req, res) => {
       });
     }
     
-    // Get user's purchase history to calculate detailed progress
+    // Get user's purchase history AFTER goal creation to calculate detailed progress
     const orders = await Order.find({ 
       user: userId, 
-      paymentStatus: 'paid' 
+      paymentStatus: 'paid',
+      createdAt: { $gte: goal.createdAt } // Only count purchases after goal was created
     }).populate('items.product');
     
     let totalPurchases = 0;
@@ -234,9 +236,19 @@ router.get('/:id/progress', authenticateToken, async (req, res) => {
       });
     });
     
+    // Track previous percentage for notification comparison
+    const previousPercentage = goal.progress.currentPercentage;
+    
     // Update goal progress
     goal.updateProgress(totalPurchases, goalMetPurchases);
     await goal.save();
+    
+    // Check and create milestone notifications
+    await NotificationHelper.checkAndCreateMilestoneNotifications(
+      goal, 
+      previousPercentage, 
+      goal.progress.currentPercentage
+    );
     
     res.json({
       success: true,
@@ -301,10 +313,11 @@ router.post('/track-purchase', authenticateToken, async (req, res) => {
     
     // Update progress for each active goal
     for (const goal of activeGoals) {
-      // Get all completed orders for this user
+      // Get completed orders AFTER goal creation for this user
       const allOrders = await Order.find({ 
         user: userId, 
-        paymentStatus: 'paid' 
+        paymentStatus: 'paid',
+        createdAt: { $gte: goal.createdAt } // Only count purchases after goal was created
       }).populate('items.product');
       
       let totalPurchases = 0;
@@ -319,15 +332,25 @@ router.post('/track-purchase', authenticateToken, async (req, res) => {
         });
       });
       
+      // Track previous percentage for notification comparison
+      const previousPercentage = goal.progress.currentPercentage;
+      
       // Update goal progress
       goal.updateProgress(totalPurchases, goalMetPurchases);
       await goal.save();
       
+      // Check and create milestone notifications
+      await NotificationHelper.checkAndCreateMilestoneNotifications(
+        goal, 
+        previousPercentage, 
+        goal.progress.currentPercentage
+      );
+      
       updatedGoals.push({
         goalId: goal._id,
         title: goal.title,
-        previousPercentage: goal.progress.currentPercentage,
-        newPercentage: totalPurchases > 0 ? Math.round((goalMetPurchases / totalPurchases) * 100) : 0,
+        previousPercentage,
+        newPercentage: goal.progress.currentPercentage,
         isAchieved: goal.isAchieved
       });
     }

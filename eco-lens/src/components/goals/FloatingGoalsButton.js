@@ -87,7 +87,7 @@ const FloatingGoalsButton = ({
     Animated.timing(popupAnim, {
       toValue: 0,
       duration: 200,
-      easing: Easing.in(Easing.cubic),
+      easing: Easing.in(Easing.ease),
       useNativeDriver: true,
     }).start(() => {
       setIsPopupVisible(false);

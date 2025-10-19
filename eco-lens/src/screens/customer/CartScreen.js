@@ -79,7 +79,8 @@ const CartScreen = ({ navigation }) => {
   // Shipping address form - prepopulate with user data
   const [shippingAddress, setShippingAddress] = useState({
     fullName: '',
-    address: '',
+    addressLine1: '',
+    addressLine2: '',
     city: '',
     state: '',
     postalCode: '',
@@ -99,7 +100,8 @@ const CartScreen = ({ navigation }) => {
       
       setShippingAddress({
         fullName,
-        address,
+        addressLine1: address,
+        addressLine2: '',
         city: '', // Not in User model - user needs to fill
         state: '', // Not in User model - user needs to fill
         postalCode: '', // Not in User model - user needs to fill
@@ -333,10 +335,10 @@ const CartScreen = ({ navigation }) => {
     }
     
     // Address validation
-    if (!shippingAddress.address.trim()) {
-      errors.address = 'Address is required';
-    } else if (shippingAddress.address.trim().length < 5) {
-      errors.address = 'Please enter a complete address';
+    if (!shippingAddress.addressLine1.trim()) {
+      errors.addressLine1 = 'Address is required';
+    } else if (shippingAddress.addressLine1.trim().length < 5) {
+      errors.addressLine1 = 'Please enter a complete address';
     }
     
     // City validation
@@ -638,22 +640,28 @@ const CartScreen = ({ navigation }) => {
               )}
               
               <TextInput
-                style={[styles.input, styles.addressInput, validationErrors.address && styles.inputError]}
-                placeholder="Full Address (Street, Building, Apt/Unit) *"
-                value={shippingAddress.address}
+                style={[styles.input, styles.addressInput, validationErrors.addressLine1 && styles.inputError]}
+                placeholder="Address Line 1 (Street, Building) *"
+                value={shippingAddress.addressLine1}
                 onChangeText={(text) => {
-                  setShippingAddress({ ...shippingAddress, address: text });
-                  if (validationErrors.address) {
-                    setValidationErrors({ ...validationErrors, address: null });
+                  setShippingAddress({ ...shippingAddress, addressLine1: text });
+                  if (validationErrors.addressLine1) {
+                    setValidationErrors({ ...validationErrors, addressLine1: null });
                   }
                 }}
                 multiline
-                numberOfLines={3}
-                textAlignVertical="top"
+                numberOfLines={2}
               />
-              {validationErrors.address && (
-                <Text style={styles.errorText}>{validationErrors.address}</Text>
+              {validationErrors.addressLine1 && (
+                <Text style={styles.errorText}>{validationErrors.addressLine1}</Text>
               )}
+              
+              <TextInput
+                style={[styles.input, styles.addressInput]}
+                placeholder="Address Line 2 (Apt/Unit - Optional)"
+                value={shippingAddress.addressLine2}
+                onChangeText={(text) => setShippingAddress({ ...shippingAddress, addressLine2: text })}
+              />
               
               <TextInput
                 style={[styles.input, validationErrors.city && styles.inputError]}

@@ -43,7 +43,7 @@ const AnimatedProgressBar = ({
     Animated.timing(progressAnim, {
       toValue: progressPercentage,
       duration: animationDuration,
-      easing: Easing.out(Easing.cubic),
+      easing: Easing.out(Easing.ease),
       useNativeDriver: false,
     }).start();
 

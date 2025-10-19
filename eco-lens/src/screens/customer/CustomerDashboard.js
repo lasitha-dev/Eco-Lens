@@ -37,6 +37,8 @@ import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import GoalProgressCard from '../../components/goals/GoalProgressCard';
 import GoalIndicatorLegend from '../../components/goals/GoalIndicatorLegend';
 import FloatingGoalsButton from '../../components/goals/FloatingGoalsButton';
+import NotificationBell from '../../components/NotificationBell';
+import NotificationList from '../../components/NotificationList';
 import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
@@ -90,6 +92,9 @@ const CustomerDashboard = ({ navigation }) => {
 
   // Goal indicator legend state
   const [showGoalLegend, setShowGoalLegend] = useState(false);
+
+  // Notification modal state
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
 
   // Get products to display based on current view
   const getDisplayProducts = () => {
@@ -666,6 +671,11 @@ const CustomerDashboard = ({ navigation }) => {
             >
               <Text style={styles.debugButtonText}>🔍</Text>
             </TouchableOpacity>
+            <NotificationBell
+              onPress={() => setNotificationModalVisible(true)}
+              iconSize={24}
+              iconColor={theme.colors.textPrimary}
+            />
             <TouchableOpacity 
               style={styles.profileIcon}
               onPress={() => navigation.navigate('Profile')}
@@ -871,6 +881,25 @@ const CustomerDashboard = ({ navigation }) => {
         onViewAllPress={() => navigation.navigate('SustainabilityGoals')}
         onGoalPress={(goal) => navigation.navigate('GoalProgress', { goal })}
         onAddGoalPress={() => navigation.navigate('GoalSetup', { mode: 'create' })}
+      />
+
+      {/* Notification Modal */}
+      <NotificationList
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+        onNotificationPress={(notification) => {
+          setNotificationModalVisible(false);
+          if (notification.goalId) {
+            // Handle both object and string goalId
+            const goalId = typeof notification.goalId === 'object' 
+              ? notification.goalId?._id || notification.goalId?.id
+              : notification.goalId;
+            
+            if (goalId) {
+              navigation.navigate('GoalProgress', { goalId });
+            }
+          }
+        }}
       />
     </SafeAreaView>
   );
