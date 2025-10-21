@@ -23,7 +23,6 @@ import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
 import SustainabilityGoalService from '../../api/sustainabilityGoalService';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
-import PostPurchaseRatingManager from '../../components/PostPurchaseRatingManager';
 import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 
 const PaymentReviewScreen = ({ route, navigation }) => {
@@ -31,8 +30,6 @@ const PaymentReviewScreen = ({ route, navigation }) => {
   const { auth: token } = useAuth();
   const { refreshGoals } = useRealtimeGoals(); // Add goal refresh capability
   const [processing, setProcessing] = useState(false);
-  const [showRatingFlow, setShowRatingFlow] = useState(false);
-  const [completedOrder, setCompletedOrder] = useState(null);
 
   // Mask card number (show last 4 digits)
   const maskCardNumber = (cardNumber) => {
@@ -184,7 +181,6 @@ const PaymentReviewScreen = ({ route, navigation }) => {
       if (data.success) {
         // Payment successful - track purchase against goals
         const order = data.order;
-        setCompletedOrder(order);
         
         // Track purchase against sustainability goals
         try {
@@ -199,8 +195,8 @@ const PaymentReviewScreen = ({ route, navigation }) => {
           // Continue anyway - don't block the user flow
         }
         
-        // Show rating flow
-        setShowRatingFlow(true);
+        // Skip rating flow and go directly to success message
+        await showPaymentSuccessWithGoals(order);
       } else {
         Alert.alert('Payment Failed', data.error || 'Failed to process payment. Please try again.');
       }
@@ -210,46 +206,6 @@ const PaymentReviewScreen = ({ route, navigation }) => {
     } finally {
       setProcessing(false);
     }
-  };
-
-  // Handle rating flow completion
-  const handleRatingFlowComplete = async () => {
-    setShowRatingFlow(false);
-    
-    // Show enhanced success message with goal updates
-    await showPaymentSuccessWithGoals(completedOrder);
-  };
-  
-  // Legacy alert handler (kept for reference)
-  const handleRatingFlowCompleteLegacy = () => {
-    setShowRatingFlow(false);
-    Alert.alert(
-      'Thank You! 🎉',
-      `Your order ${completedOrder.orderNumber} has been placed successfully.`,
-      [
-        {
-          text: 'View Order',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [
-                { name: 'Dashboard' },
-                { name: 'OrderDetails', params: { orderId: completedOrder._id } }
-              ],
-            });
-          },
-        },
-        {
-          text: 'Continue Shopping',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
-            });
-          },
-        },
-      ]
-    );
   };
 
   return (
@@ -378,14 +334,6 @@ const PaymentReviewScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Post-Purchase Rating Flow */}
-      <PostPurchaseRatingManager
-        visible={showRatingFlow}
-        onComplete={handleRatingFlowComplete}
-        orderId={completedOrder?._id}
-        orderItems={cartItems}
-        authToken={token}
-      />
     </SafeAreaView>
   );
 };

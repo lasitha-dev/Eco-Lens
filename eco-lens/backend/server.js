@@ -19,6 +19,7 @@ const dynamicRecommendationRoutes = require('./routes/dynamicRecommendationRoute
 const sustainabilityGoalRoutes = require('./routes/sustainabilityGoalRoutes');
 const ratingRoutes = require('./routes/ratingRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const { router: authRoutes, generateAccessToken, generateRefreshToken } = require('./routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || 5002;
 
@@ -264,12 +265,14 @@ app.post('/api/register', async (req, res) => {
       console.log('⚠️  User saved to in-memory storage. Total users in memory:', inMemoryUsers.length);
     }
 
-    // Generate JWT token
+    // Generate JWT token and refresh token
     const token = generateToken(newUser);
+    const refreshToken = await generateRefreshToken(newUser._id);
 
     res.status(201).json({
       message: 'Registration successful',
       token,
+      refreshToken,
       user: {
         id: newUser._id,
         firstName: newUser.firstName,
@@ -322,12 +325,14 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Generate JWT token
+    // Generate JWT token and refresh token
     const token = generateToken(user);
+    const refreshToken = await generateRefreshToken(user._id);
 
     res.json({
       message: 'Login successful',
       token,
+      refreshToken,
       user: {
         id: user._id,
         firstName: user.firstName,

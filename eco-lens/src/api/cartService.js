@@ -25,12 +25,12 @@ class CartService {
     }
   }
 
-  // Add item to cart
+  // Add item to cart - Optimized for faster response
   static async addToCart(productId, quantity, token) {
     try {
-      // Add timeout to prevent hanging
+      // Reduced timeout for faster failure detection
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`${API_BASE_URL}/cart/add`, {
         method: 'POST',
@@ -46,6 +46,12 @@ class CartService {
       });
 
       clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add to cart');
+      }
+      
       const data = await response.json();
       return data;
     } catch (error) {

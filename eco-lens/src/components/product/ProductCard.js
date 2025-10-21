@@ -92,7 +92,7 @@ const ProductCard = memo(({
     }
   }, [activeGoals.length, goalAlignment]);
 
-  // Memoized goal alignment icon
+  // Memoized goal alignment icon - Only show positive matches
   const goalAlignmentIcon = useMemo(() => {
     if (!activeGoals.length) return null;
     
@@ -103,7 +103,8 @@ const ProductCard = memo(({
     } else if (alignmentPercentage > 0) {
       return { name: 'checkmark-circle-outline', color: theme.colors.success, size: 16 };
     } else {
-      return { name: 'close-circle-outline', color: theme.colors.textSecondary, size: 16 };
+      // Don't show X icon for non-matching products
+      return null;
     }
   }, [activeGoals.length, goalAlignment]);
 

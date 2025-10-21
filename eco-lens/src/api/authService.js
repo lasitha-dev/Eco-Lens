@@ -1,10 +1,12 @@
 import { API_BASE_URL } from '../config/api';
 import { showNetworkTroubleshootingTips } from '../utils/networkUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ApiErrorHandler from '../utils/apiErrorHandler';
 
 class AuthService {
   // Token storage keys
   static TOKEN_KEY = '@eco_lens_token';
+  static REFRESH_TOKEN_KEY = '@eco_lens_refresh_token';
   static USER_KEY = '@eco_lens_user';
 
   // Get stored authentication data
@@ -28,12 +30,18 @@ class AuthService {
   }
 
   // Store authentication data
-  static async storeAuth(token, user) {
+  static async storeAuth(token, user, refreshToken = null) {
     try {
-      await Promise.all([
+      const promises = [
         AsyncStorage.setItem(this.TOKEN_KEY, token),
         AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user))
-      ]);
+      ];
+      
+      if (refreshToken) {
+        promises.push(AsyncStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken));
+      }
+      
+      await Promise.all(promises);
     } catch (error) {
       console.error('Error storing auth:', error);
       throw error;
@@ -45,7 +53,8 @@ class AuthService {
     try {
       await Promise.all([
         AsyncStorage.removeItem(this.TOKEN_KEY),
-        AsyncStorage.removeItem(this.USER_KEY)
+        AsyncStorage.removeItem(this.USER_KEY),
+        AsyncStorage.removeItem(this.REFRESH_TOKEN_KEY)
       ]);
     } catch (error) {
       console.error('Error clearing auth:', error);
@@ -187,8 +196,8 @@ class AuthService {
 
       const data = await response.json();
       
-      // Store authentication data
-      await this.storeAuth(data.token, data.user);
+      // Store authentication data including refresh token
+      await this.storeAuth(data.token, data.user, data.refreshToken);
       
       console.log(`✅ Login successful for ${data.user.role}: ${data.user.email}`);
       
@@ -210,9 +219,60 @@ class AuthService {
     }
   }
 
+  // Refresh access token using refresh token
+  static async refreshAccessToken() {
+    try {
+      const refreshToken = await AsyncStorage.getItem(this.REFRESH_TOKEN_KEY);
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken })
+      });
+      
+      if (!response.ok) {
+        // Refresh token is invalid or expired, clear auth
+        await this.clearAuth();
+        throw new Error('Refresh token expired');
+      }
+      
+      const data = await response.json();
+      
+      // Store new access token (keep existing refresh token)
+      await this.storeAuth(data.token, data.user, refreshToken);
+      
+      return data.token;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      throw error;
+    }
+  }
+
   // Logout user
   static async logoutUser() {
     try {
+      // Try to revoke refresh token on server
+      const refreshToken = await AsyncStorage.getItem(this.REFRESH_TOKEN_KEY);
+      if (refreshToken) {
+        try {
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ refreshToken })
+          });
+        } catch (err) {
+          console.warn('Failed to revoke refresh token on server:', err);
+        }
+      }
+      
       await this.clearAuth();
       console.log('✅ User logged out successfully');
     } catch (error) {
@@ -565,10 +625,10 @@ class AuthService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${API_BASE_URL}/profile`, {
-        method: 'GET',
-        headers,
-      });
+      const response = await ApiErrorHandler.fetchWithErrorHandling(
+        `${API_BASE_URL}/profile`,
+        { method: 'GET', headers }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();

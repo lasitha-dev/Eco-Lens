@@ -24,8 +24,7 @@ const passwordResetSchema = new mongoose.Schema({
 // Index for automatic expiration
 passwordResetSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// Index for token lookup
-passwordResetSchema.index({ token: 1 });
+// Note: Token index is automatically created by unique: true constraint (line 12)
 
 const PasswordReset = mongoose.model('PasswordReset', passwordResetSchema);
 
