@@ -1,10 +1,12 @@
 import { API_BASE_URL } from '../config/api';
 import { showNetworkTroubleshootingTips } from '../utils/networkUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ApiErrorHandler from '../utils/apiErrorHandler';
 
 class AuthService {
   // Token storage keys
   static TOKEN_KEY = '@eco_lens_token';
+  static REFRESH_TOKEN_KEY = '@eco_lens_refresh_token';
   static USER_KEY = '@eco_lens_user';
 
   // Get stored authentication data
@@ -28,12 +30,18 @@ class AuthService {
   }
 
   // Store authentication data
-  static async storeAuth(token, user) {
+  static async storeAuth(token, user, refreshToken = null) {
     try {
-      await Promise.all([
+      const promises = [
         AsyncStorage.setItem(this.TOKEN_KEY, token),
         AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user))
-      ]);
+      ];
+      
+      if (refreshToken) {
+        promises.push(AsyncStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken));
+      }
+      
+      await Promise.all(promises);
     } catch (error) {
       console.error('Error storing auth:', error);
       throw error;
@@ -45,7 +53,8 @@ class AuthService {
     try {
       await Promise.all([
         AsyncStorage.removeItem(this.TOKEN_KEY),
-        AsyncStorage.removeItem(this.USER_KEY)
+        AsyncStorage.removeItem(this.USER_KEY),
+        AsyncStorage.removeItem(this.REFRESH_TOKEN_KEY)
       ]);
     } catch (error) {
       console.error('Error clearing auth:', error);
@@ -187,8 +196,8 @@ class AuthService {
 
       const data = await response.json();
       
-      // Store authentication data
-      await this.storeAuth(data.token, data.user);
+      // Store authentication data including refresh token
+      await this.storeAuth(data.token, data.user, data.refreshToken);
       
       console.log(`✅ Login successful for ${data.user.role}: ${data.user.email}`);
       
@@ -210,74 +219,37 @@ class AuthService {
     }
   }
 
-  static async googleLogin(idToken) {
+  // Refresh access token using refresh token
+  static async refreshAccessToken() {
     try {
-      console.log(`Logging in with Google at: ${API_BASE_URL}/auth/google/token`);
-      console.log('ID Token length:', idToken ? idToken.length : 'No token provided');
+      const refreshToken = await AsyncStorage.getItem(this.REFRESH_TOKEN_KEY);
       
-      // Check if idToken is provided
-      if (!idToken) {
-        throw new Error('Google ID token is missing. This might be due to OAuth configuration issues.');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
       }
       
-      const response = await fetch(`${API_BASE_URL}/auth/google/token`, {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ refreshToken })
       });
-
-      console.log('Google login response status:', response.status);
-      console.log('Google login response headers:', [...response.headers.entries()]);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Google login server error:', errorData);
-        
-        // Provide more specific error messages
-        if (response.status === 400) {
-          throw new Error('Invalid Google token. Please try signing in again.');
-        } else if (response.status === 401) {
-          throw new Error('Authentication failed. Please check your Google account permissions.');
-        } else if (response.status === 500) {
-          throw new Error('Server error during Google authentication. Please try again later.');
-        }
-        
-        throw new Error(errorData.error || `Google login failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Google login response data:', data);
-      await this.storeAuth(data.token, data.user);
-      console.log(`✅ Google login successful for ${data.user.email}`);
-      return {
-        ...data,
-        isAdmin: data.user.role === 'admin',
-        isCustomer: data.user.role === 'customer'
-      };
-    } catch (error) {
-      console.error('Error with Google login:', error);
-      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
-        throw new Error('Unable to connect to server. Please check your network connection.');
-      }
-      throw error;
-    }
-  }
-
-  // Handle Google redirect URL (for web flow)
-  static async handleGoogleRedirect(url) {
-    try {
-      // Extract token from URL if needed
-      // This is typically not needed with Expo AuthSession as the token is in the response
-      console.log('Handling Google redirect URL:', url);
       
-      // For now, we'll just throw an error as this shouldn't be called
-      // with the Expo AuthSession flow
-      throw new Error('Direct URL handling not implemented for Expo AuthSession flow');
+      if (!response.ok) {
+        // Refresh token is invalid or expired, clear auth
+        await this.clearAuth();
+        throw new Error('Refresh token expired');
+      }
+      
+      const data = await response.json();
+      
+      // Store new access token (keep existing refresh token)
+      await this.storeAuth(data.token, data.user, refreshToken);
+      
+      return data.token;
     } catch (error) {
-      console.error('Error handling Google redirect:', error);
+      console.error('Error refreshing token:', error);
       throw error;
     }
   }
@@ -285,6 +257,22 @@ class AuthService {
   // Logout user
   static async logoutUser() {
     try {
+      // Try to revoke refresh token on server
+      const refreshToken = await AsyncStorage.getItem(this.REFRESH_TOKEN_KEY);
+      if (refreshToken) {
+        try {
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ refreshToken })
+          });
+        } catch (err) {
+          console.warn('Failed to revoke refresh token on server:', err);
+        }
+      }
+      
       await this.clearAuth();
       console.log('✅ User logged out successfully');
     } catch (error) {
@@ -467,6 +455,29 @@ class AuthService {
     }
   }
 
+  // Update fingerprint setting
+  static async updateFingerprintSetting(fingerprintEnabled) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile/fingerprint-settings`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ fingerprintEnabled })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update fingerprint setting');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating fingerprint setting:', error);
+      throw error;
+    }
+  }
+
   // Delete profile photo
   static async deleteProfilePhoto() {
     try {
@@ -489,38 +500,29 @@ class AuthService {
     }
   }
 
-  // Google OAuth Login
-  static async googleLogin(idToken) {
+  // Request password reset
+  static async requestPasswordReset(email) {
     try {
-      console.log('Sending Google ID token to backend for verification');
+      console.log(`Requesting password reset for: ${email}`);
       
-      const response = await fetch(`${API_BASE_URL}/auth/google/token`, {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ email }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Google login failed:', errorData);
-        throw new Error(errorData.error || 'Google login failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send reset email');
       }
 
       const data = await response.json();
-      console.log('Google login successful:', data);
-      
-      // Store authentication data
-      await this.storeAuth(data.token, data.user);
-      
-      return {
-        ...data,
-        isAdmin: data.user.role === 'admin',
-        isCustomer: data.user.role === 'customer'
-      };
+      console.log('✅ Password reset request successful');
+      return data;
     } catch (error) {
-      console.error('Error with Google login:', error);
+      console.error('Error requesting password reset:', error);
       
       if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
         console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
@@ -530,6 +532,166 @@ class AuthService {
       throw error;
     }
   }
+
+  // Verify reset token
+  static async verifyResetToken(token) {
+    try {
+      console.log('Verifying reset token...');
+      
+      const response = await fetch(`${API_BASE_URL}/auth/verify-reset-token?token=${token}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Invalid or expired token');
+      }
+
+      const data = await response.json();
+      console.log('✅ Reset token is valid');
+      return data;
+    } catch (error) {
+      console.error('Error verifying reset token:', error);
+      
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Reset password with token
+  static async resetPassword(token, newPassword) {
+    try {
+      console.log('Resetting password with token...');
+
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reset password');
+      }
+
+      const data = await response.json();
+      console.log('✅ Password reset successful');
+      return data;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        console.log('Network troubleshooting tips:', showNetworkTroubleshootingTips());
+        throw new Error('Unable to connect to server. Please check your network connection.');
+      }
+
+      throw error;
+    }
+  }
+
+  // Get user profile
+  static async getUserProfile() {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      throw error;
+    }
+  }
+
+  // Fetch complete user profile from database
+  static async fetchUserProfile() {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await ApiErrorHandler.fetchWithErrorHandling(
+        `${API_BASE_URL}/profile`,
+        { method: 'GET', headers }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      throw error;
+    }
+  }
+
+  // Update user profile
+  static async updateProfile(profileData) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(profileData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  }
+
+  // Update fingerprint setting
+  static async updateFingerprintSetting(fingerprintEnabled) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/profile/fingerprint-settings`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ fingerprintEnabled })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update fingerprint setting');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating fingerprint setting:', error);
+      throw error;
+    }
+  }
+
+  // Delete profile photo (duplicate removed)
+  // This was a duplicate, removed to avoid conflicts
+
 }
 
 export default AuthService;

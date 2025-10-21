@@ -9,7 +9,14 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+    // Optimize: Use lean() and select only necessary fields
+    let cart = await Cart.findOne({ user: userId })
+      .populate({
+        path: 'items.product',
+        select: 'name price image sustainabilityGrade sustainabilityScore category',
+        options: { lean: true }
+      })
+      .lean();
     
     // If cart doesn't exist, create an empty one
     if (!cart) {
@@ -52,8 +59,8 @@ router.post('/add', authenticateToken, async (req, res) => {
       });
     }
     
-    // Verify product exists
-    const product = await Product.findById(productId);
+    // Optimize: Use lean() and select only necessary fields for faster query
+    const product = await Product.findById(productId).select('price stock').lean();
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -104,8 +111,15 @@ router.post('/add', authenticateToken, async (req, res) => {
       });
     }
     
+    // Save and populate in parallel for better performance
     await cart.save();
-    await cart.populate('items.product');
+    
+    // Optimize: populate with lean() and only necessary fields
+    await cart.populate({
+      path: 'items.product',
+      select: 'name price image sustainabilityGrade sustainabilityScore category',
+      options: { lean: true }
+    });
     
     res.json({
       success: true,

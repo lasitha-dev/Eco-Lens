@@ -3,13 +3,12 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { AuthProvider, useAuth } from "./src/hooks/useAuthLogin";
 import { FavoritesProvider } from "./src/hooks/useFavorites";
+import { RealtimeGoalProvider } from "./src/contexts/RealtimeGoalContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
+import GlobalAnimationOverlay from "./src/components/GlobalAnimationOverlay";
 import AppNavigator from './src/navigation/AppNavigator';
-
-// Add this line to properly handle redirects
-WebBrowser.maybeCompleteAuthSession();
 
 // Simple loading splash component
 const LoadingSplash = () => {
@@ -36,7 +35,6 @@ const Navigation = () => {
     config: {
       screens: {
         Login: 'login',
-        GoogleAuthCallback: 'auth/google-callback',
         // Add a fallback for any other routes
         '*': '*',
       },
@@ -46,12 +44,17 @@ const Navigation = () => {
   console.log('Linking prefixes:', linking.prefixes);
 
   return (
-    <FavoritesProvider> 
-      <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
-        <AppNavigator />
-        <StatusBar style="auto" />
-      </NavigationContainer>
-    </FavoritesProvider>
+    <NotificationProvider>
+      <FavoritesProvider> 
+        <RealtimeGoalProvider>
+          <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
+            <AppNavigator />
+            <StatusBar style="auto" />
+            <GlobalAnimationOverlay />
+          </NavigationContainer>
+        </RealtimeGoalProvider>
+      </FavoritesProvider>
+    </NotificationProvider>
   );
 };
 

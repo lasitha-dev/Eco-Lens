@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import EcoGradeBadge from './EcoGradeBadge';
 import FavoriteIcon from '../FavoriteIcon';
+import StarRating from '../StarRating';
 import theme from '../../styles/theme';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -25,7 +26,8 @@ const ProductDetailModal = ({
   visible, 
   product, 
   onClose,
-  onAddToCart 
+  onAddToCart,
+  navigation 
 }) => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -120,10 +122,23 @@ const ProductDetailModal = ({
             <Text style={styles.productName}>{name}</Text>
             
             {/* Rating */}
-            <View style={styles.ratingRow}>
-              <Text style={styles.rating}>⭐ {rating}</Text>
-              <Text style={styles.reviewCount}>({reviewCount} reviews)</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.ratingRow} 
+              onPress={() => {
+                if (navigation) {
+                  navigation.navigate('ProductReviews', { product });
+                }
+              }}
+            >
+              <StarRating
+                rating={product.ratingStats?.averageRating || rating || 0}
+                totalRatings={product.ratingStats?.totalRatings || reviewCount || 0}
+                size={18}
+                showText={true}
+                showCount={true}
+              />
+              <Text style={styles.viewReviewsText}>View Reviews →</Text>
+            </TouchableOpacity>
 
             {/* Price */}
             <View style={styles.priceRow}>
@@ -324,6 +339,7 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: theme.spacing.m,
   },
   
@@ -336,6 +352,12 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: theme.typography.fontSize.body2,
     color: theme.colors.textSecondary,
+  },
+  
+  viewReviewsText: {
+    fontSize: theme.typography.fontSize.body2,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeight.medium,
   },
   
   priceRow: {

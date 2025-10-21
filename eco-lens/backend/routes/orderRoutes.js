@@ -4,7 +4,127 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const SustainabilityGoal = require('../models/SustainabilityGoal');
 const { authenticateToken } = require('../middleware/auth');
+
+// Import the advanced calculator (we'll create a backend version)
+const GoalProgressCalculator = require('../utils/GoalProgressCalculator');
+
+// Helper function to track purchase against sustainability goals
+const trackPurchaseForGoals = async (userId, orderId) => {
+  try {
+    console.log(`🎯 Tracking purchase for sustainability goals - User: ${userId}, Order: ${orderId}`);
+    
+    // Get all active goals for the user
+    const activeGoals = await SustainabilityGoal.find({ 
+      userId, 
+      isActive: true 
+    });
+    
+    if (activeGoals.length === 0) {
+      console.log('No active goals found for user');
+      return {
+        success: true,
+        message: 'No active goals to track',
+        goalUpdates: []
+      };
+    }
+    
+    // Get the completed order with product details
+    const order = await Order.findById(orderId).populate('items.product');
+    if (!order) {
+      console.error('Order not found for goal tracking');
+      return {
+        success: false,
+        error: 'Order not found'
+      };
+    }
+    
+    console.log(`📊 Processing ${order.items.length} items against ${activeGoals.length} goals`);
+    
+    // Get all completed orders for this user for comprehensive progress calculation
+    const allCompletedOrders = await Order.find({ 
+      user: userId, 
+      paymentStatus: 'paid' 
+    }).populate('items.product');
+    
+    const goalUpdates = [];
+    
+    // Use the advanced calculator for each goal
+    for (const goal of activeGoals) {
+      try {
+        // Calculate new comprehensive progress using all orders
+        const newProgress = GoalProgressCalculator.calculateGoalProgress(
+          goal, 
+          allCompletedOrders,
+          { 
+            includeProjections: true,
+            weightByQuantity: true 
+          }
+        );
+        
+        // Update the goal's progress in the database
+        goal.progress = {
+          totalPurchases: newProgress.totalPurchases,
+          goalMetPurchases: newProgress.goalMetPurchases,
+          currentPercentage: newProgress.currentPercentage
+        };
+        
+        // Update virtual properties
+        goal.isAchieved = newProgress.isAchieved;
+        goal.progressStatus = newProgress.progressStatus;
+        
+        await goal.save();
+        
+        goalUpdates.push({
+          goalId: goal._id,
+          goalTitle: goal.title,
+          previousPercentage: goal.progress.currentPercentage || 0,
+          newPercentage: newProgress.currentPercentage,
+          isNewlyAchieved: !goal.isAchieved && newProgress.isAchieved,
+          insights: newProgress.insights,
+          breakdown: newProgress.breakdown,
+          streaks: newProgress.streaks
+        });
+        
+        console.log(`✅ Updated goal "${goal.title}": ${newProgress.goalMetPurchases}/${newProgress.totalPurchases} purchases (${newProgress.currentPercentage.toFixed(1)}%)`);
+        
+        // Log achievement
+        if (newProgress.isAchieved && !goal.isAchieved) {
+          console.log(`🎉 GOAL ACHIEVED! "${goal.title}" has been completed!`);
+        }
+        
+      } catch (goalError) {
+        console.error(`❌ Error updating goal "${goal.title}":`, goalError);
+        goalUpdates.push({
+          goalId: goal._id,
+          goalTitle: goal.title,
+          error: goalError.message
+        });
+      }
+    }
+    
+    console.log(`🎉 Successfully tracked purchase against ${activeGoals.length} goals`);
+    
+    return {
+      success: true,
+      message: `Updated ${goalUpdates.length} goals`,
+      goalUpdates,
+      orderProcessed: {
+        orderId,
+        itemCount: order.items.length,
+        totalValue: order.totalAmount
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Error tracking purchase for goals:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
 
 // Helper function to get card brand from number
 const getCardBrand = (cardNumber) => {
@@ -111,6 +231,10 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
     cart.items = [];
     await cart.save();
     
+    // Track purchase against sustainability goals (async - don't block response)
+    const goalTrackingPromise = trackPurchaseForGoals(userId, order._id);
+    
+    // Send response immediately for better UX
     res.json({
       success: true,
       message: 'Payment successful',
@@ -122,6 +246,23 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
         paymentStatus: order.paymentStatus
       }
     });
+    
+    // Handle goal tracking results asynchronously
+    goalTrackingPromise
+      .then(result => {
+        if (result?.success && result?.goalUpdates?.length > 0) {
+          console.log(`📈 Goal updates completed for order ${order.orderNumber}:`, result.goalUpdates.length, 'goals updated');
+          
+          // Check for achievements
+          const achievements = result.goalUpdates.filter(update => update.isNewlyAchieved);
+          if (achievements.length > 0) {
+            console.log(`🏆 New achievements detected:`, achievements.map(a => a.goalTitle));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Background goal tracking failed:', error);
+      });
   } catch (error) {
     console.error('Error creating payment intent:', error);
     res.status(500).json({
@@ -299,7 +440,27 @@ async function handleSuccessfulPayment(session) {
         { items: [] }
       );
       
+      // Track purchase against sustainability goals (async - don't block)
+      const goalTrackingPromise = trackPurchaseForGoals(order.user, order._id);
+      
       console.log('Order payment successful:', order.orderNumber);
+      
+      // Handle goal tracking results asynchronously
+      goalTrackingPromise
+        .then(result => {
+          if (result?.success && result?.goalUpdates?.length > 0) {
+            console.log(`📈 Webhook goal updates completed for order ${order.orderNumber}:`, result.goalUpdates.length, 'goals updated');
+            
+            // Check for achievements
+            const achievements = result.goalUpdates.filter(update => update.isNewlyAchieved);
+            if (achievements.length > 0) {
+              console.log(`🏆 Webhook achievements detected:`, achievements.map(a => a.goalTitle));
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Background goal tracking failed for webhook:', error);
+        });
     }
   } catch (error) {
     console.error('Error handling successful payment:', error);

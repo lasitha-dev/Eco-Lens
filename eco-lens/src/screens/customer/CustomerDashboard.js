@@ -21,6 +21,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ProductCard from '../../components/product/ProductCard';
 import ProductDetailModal from '../../components/product/ProductDetailModal';
@@ -32,6 +33,13 @@ import SearchAnalyticsService from '../../api/searchAnalyticsService';
 import EnhancedRecommendationService from '../../api/enhancedRecommendationService';
 import DynamicRecommendationService from '../../api/dynamicRecommendationService';
 import CartService from '../../api/cartService';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import GoalProgressCard from '../../components/goals/GoalProgressCard';
+import GoalIndicatorLegend from '../../components/goals/GoalIndicatorLegend';
+import FloatingGoalsButton from '../../components/goals/FloatingGoalsButton';
+import NotificationBell from '../../components/NotificationBell';
+import NotificationList from '../../components/NotificationList';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { testAuthToken } from '../../utils/authTest';
 import SimpleAuthDebugger from '../../components/SimpleAuthDebugger';
@@ -42,6 +50,17 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const CustomerDashboard = ({ navigation }) => {
   const { user, auth } = useAuth();
+  
+  // Use real-time goals context instead of manual state management
+  const {
+    goals,
+    activeGoals,
+    goalStats,
+    loading: goalsLoading,
+    refreshGoals,
+    hasActiveGoals,
+    validateCartAgainstGoals,
+  } = useRealtimeGoals();
 
   // State management
   const [products, setProducts] = useState([]);
@@ -70,6 +89,82 @@ const CustomerDashboard = ({ navigation }) => {
   // Cart toast state
   const [showCartToast, setShowCartToast] = useState(false);
   const [cartToastMessage, setCartToastMessage] = useState('');
+
+  // Goal indicator legend state
+  const [showGoalLegend, setShowGoalLegend] = useState(false);
+
+  // Notification modal state
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+
+  // Get products to display based on current view
+  const getDisplayProducts = () => {
+    console.log('getDisplayProducts called:');
+    console.log('- showPersonalized:', showPersonalized);
+    console.log('- surveyCompleted:', surveyCompleted);
+    console.log('- personalizedProducts.length:', personalizedProducts.length);
+    console.log('- products.length:', products.length);
+    
+    if (showPersonalized && personalizedProducts.length > 0) {
+      console.log('Returning personalized products');
+      return personalizedProducts;
+    }
+    
+    if (surveyCompleted && personalizedProducts.length === 0) {
+      console.log('Survey completed but no personalized products yet, returning all products');
+    }
+    
+    console.log('Returning all products');
+    return products;
+  };
+
+  // Compute filtered products based on search, category, and filters
+  const filteredProducts = useMemo(() => {
+    console.log('filteredProducts recalculating...');
+    let filtered = getDisplayProducts();
+    
+    console.log('Initial filtered count:', filtered.length);
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.name?.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query) ||
+        product.category?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+
+    // Apply preset filters
+    if (selectedFilter && FILTER_PRESETS[selectedFilter]) {
+      const preset = FILTER_PRESETS[selectedFilter];
+      filtered = filtered.filter(product => {
+        if (preset.minScore && product.sustainabilityScore < preset.minScore) return false;
+        if (preset.grades && !preset.grades.includes(product.sustainabilityGrade)) return false;
+        if (preset.categories && !preset.categories.includes(product.category)) return false;
+        return true;
+      });
+    }
+
+    console.log('Final filtered count:', filtered.length);
+    return filtered;
+  }, [products, personalizedProducts, showPersonalized, surveyCompleted, searchQuery, selectedCategory, selectedFilter]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    Promise.all([
+      loadProducts(false),
+      loadPersonalizedRecommendations(),
+      refreshGoals()
+    ]).finally(() => {
+      setIsRefreshing(false);
+    });
+  }, []);
 
   // Handle product press with dynamic tracking
   const handleProductPress = useCallback(async (product) => {
@@ -107,41 +202,46 @@ const CustomerDashboard = ({ navigation }) => {
     setShowCartToast(true);
     setIsModalVisible(false);
 
-    // Track add to cart with dynamic recommendations
-    try {
-      await DynamicRecommendationService.trackAddToCart(product.id, quantity, 'search');
-      console.log('✅ Add to cart tracked with dynamic updates');
-      console.log(`🛒 Added to cart: ${quantity}x ${product.name} (${product.category}) - Grade: ${product.sustainabilityGrade}`);
-      
-      // Refresh personalized recommendations after tracking
-      await refreshPersonalizedRecommendations();
-    } catch (error) {
-      console.error('Error tracking add to cart with dynamic system:', error);
-      // Don't fail the add to cart, just log the error
-    }
+    console.log(`🛒 Adding to cart: ${quantity}x ${product.name}`);
 
-    try {
-      // Make API call in background
-      const response = await CartService.addToCart(product.id || product._id, quantity, auth);
-      
-      if (!response.success) {
-        // If failed, show error and hide toast
+    // Add to cart API call (critical path - must complete)
+    const addToCartPromise = CartService.addToCart(product.id || product._id, quantity, auth)
+      .then(response => {
+        if (!response.success) {
+          setShowCartToast(false);
+          Alert.alert('Error', response.error || 'Failed to add item to cart');
+          return false;
+        }
+        console.log('✅ Item added to cart successfully');
+        return true;
+      })
+      .catch(error => {
+        console.error('Error adding to cart:', error);
         setShowCartToast(false);
-        Alert.alert('Error', response.error || 'Failed to add item to cart');
-      }
-      // Success - toast already showing, no need to do anything
-    } catch (error) {
-      // If error, show error and hide toast
-      console.error('Error adding to cart:', error);
-      setShowCartToast(false);
-      Alert.alert('Error', 'Failed to add item to cart. Please try again.');
-    }
-  }, [auth, navigation]);
+        Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+        return false;
+      });
+
+    // Track in background (non-blocking - fire and forget)
+    DynamicRecommendationService.trackAddToCart(product.id, quantity, 'search')
+      .then(() => {
+        console.log('✅ Add to cart tracked');
+        // Refresh recommendations in background
+        refreshPersonalizedRecommendations().catch(err => 
+          console.warn('Failed to refresh recommendations:', err)
+        );
+      })
+      .catch(error => console.warn('Tracking failed:', error));
+
+    // Wait only for the critical cart operation
+    await addToCartPromise;
+  }, [auth, refreshPersonalizedRecommendations]);
 
   // Load products and personalized recommendations on component mount
   useEffect(() => {
     loadProducts();
     loadPersonalizedRecommendations();
+    // Goals are now automatically loaded by the RealtimeGoalProvider
     
     // Test authentication for debugging
     testAuthToken().then(result => {
@@ -433,51 +533,7 @@ const CustomerDashboard = ({ navigation }) => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, selectedCategory, selectedSort]);
 
-  // Get products to display based on current view
-  const getDisplayProducts = () => {
-    console.log('getDisplayProducts called:');
-    console.log('- showPersonalized:', showPersonalized);
-    console.log('- surveyCompleted:', surveyCompleted);
-    console.log('- personalizedProducts.length:', personalizedProducts.length);
-    console.log('- products.length:', products.length);
-    
-    if (showPersonalized && surveyCompleted) {
-      if (personalizedProducts.length > 0) {
-        console.log('Returning personalized products');
-        return personalizedProducts;
-      } else {
-        console.log('Survey completed but no personalized products yet, returning all products');
-        return products;
-      }
-    }
-    console.log('Returning all products');
-    return products;
-  };
-
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    loadProducts(false);
-    loadPersonalizedRecommendations();
-  }, []);
-
-  // Filter products locally (API handles sorting)
-  const filteredProducts = useMemo(() => {
-    console.log('filteredProducts recalculating...');
-    let filtered = [...getDisplayProducts()];
-    console.log('Initial filtered count:', filtered.length);
-
-    // Apply preset filter (API doesn't handle these custom filters)
-    if (selectedFilter) {
-      filtered = FILTER_PRESETS[selectedFilter].filter(filtered);
-      console.log('After filter applied:', filtered.length);
-    }
-
-    console.log('Final filtered count:', filtered.length);
-    return filtered;
-  }, [products, selectedFilter, showPersonalized, surveyCompleted, personalizedProducts]);
-
-  // Render filters header component (categories, filters, controls)
+  // Render sustainability goals header component
   const renderFiltersHeader = useCallback(() => (
     <View style={styles.filtersContainer}>
       {/* Categories */}
@@ -615,6 +671,11 @@ const CustomerDashboard = ({ navigation }) => {
             >
               <Text style={styles.debugButtonText}>🔍</Text>
             </TouchableOpacity>
+            <NotificationBell
+              onPress={() => setNotificationModalVisible(true)}
+              iconSize={24}
+              iconColor={theme.colors.textPrimary}
+            />
             <TouchableOpacity 
               style={styles.profileIcon}
               onPress={() => navigation.navigate('Profile')}
@@ -753,14 +814,21 @@ const CustomerDashboard = ({ navigation }) => {
             product={item}
             onPress={handleProductPress}
             isListView={isListView}
+            activeGoals={activeGoals}
+            onGoalPress={(goal) => navigation.navigate('GoalProgress', { goal })}
+            showGoalChips={activeGoals.length > 0}
           />
         )}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id || item?._id || `product-${index}`}
         numColumns={isListView ? 1 : 2}
         key={isListView ? 'list' : 'grid'}
         columnWrapperStyle={!isListView && styles.gridRow}
         contentContainerStyle={styles.productList}
-        ListHeaderComponent={renderFiltersHeader}
+        ListHeaderComponent={() => (
+          <>
+            {renderFiltersHeader()}
+          </>
+        )}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
@@ -779,6 +847,7 @@ const CustomerDashboard = ({ navigation }) => {
         product={selectedProduct}
         onClose={() => setIsModalVisible(false)}
         onAddToCart={handleAddToCart}
+        navigation={navigation}
       />
       
       {/* Auth Debugger */}
@@ -796,6 +865,41 @@ const CustomerDashboard = ({ navigation }) => {
           navigation.navigate('Cart');
         }}
         onHide={() => setShowCartToast(false)}
+      />
+
+      {/* Goal Indicator Legend Modal */}
+      <GoalIndicatorLegend
+        visible={showGoalLegend}
+        onClose={() => setShowGoalLegend(false)}
+      />
+
+      {/* Floating Goals Button */}
+      <FloatingGoalsButton
+        goals={goals}
+        goalStats={goalStats}
+        loading={goalsLoading}
+        onViewAllPress={() => navigation.navigate('SustainabilityGoals')}
+        onGoalPress={(goal) => navigation.navigate('GoalProgress', { goal })}
+        onAddGoalPress={() => navigation.navigate('GoalSetup', { mode: 'create' })}
+      />
+
+      {/* Notification Modal */}
+      <NotificationList
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+        onNotificationPress={(notification) => {
+          setNotificationModalVisible(false);
+          if (notification.goalId) {
+            // Handle both object and string goalId
+            const goalId = typeof notification.goalId === 'object' 
+              ? notification.goalId?._id || notification.goalId?.id
+              : notification.goalId;
+            
+            if (goalId) {
+              navigation.navigate('GoalProgress', { goalId });
+            }
+          }
+        }}
       />
     </SafeAreaView>
   );
@@ -1206,6 +1310,161 @@ const styles = StyleSheet.create({
     color: 'red',
     fontWeight: 'bold',
     marginTop: theme.spacing.xs,
+  },
+
+  // Sustainability Goals Styles
+  goalsContainer: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.m,
+    ...theme.shadows.card,
+  },
+  goalsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.m,
+  },
+  goalsHeaderLeft: {
+    flex: 1,
+  },
+  goalsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalHelpButton: {
+    marginLeft: theme.spacing.xs,
+    padding: 2,
+  },
+  goalsTitle: {
+    fontSize: theme.typography.fontSize.h6,
+    fontWeight: theme.typography.fontWeight.semiBold,
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+  goalsSubtitle: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+  },
+  goalsViewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+  },
+  goalsViewAllText: {
+    fontSize: theme.typography.fontSize.body2,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeight.medium,
+    marginRight: 4,
+  },
+  goalsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.l,
+  },
+  goalsLoadingText: {
+    fontSize: theme.typography.fontSize.body2,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.s,
+  },
+  goalsScrollView: {
+    marginHorizontal: -theme.spacing.xs,
+  },
+  goalsScrollContent: {
+    paddingHorizontal: theme.spacing.xs,
+  },
+  goalCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.m,
+    marginHorizontal: theme.spacing.xs,
+    width: 200,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    ...theme.shadows.small,
+  },
+  
+  goalCardSpacing: {
+    marginRight: theme.spacing.m,
+  },
+  goalCardHeader: {
+    marginBottom: theme.spacing.s,
+  },
+  goalCardTitle: {
+    fontSize: theme.typography.fontSize.body1,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    minHeight: 40,
+  },
+  goalTypeIndicator: {
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.m,
+    alignSelf: 'flex-start',
+  },
+  goalTypeText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.textOnPrimary,
+  },
+  goalProgressContainer: {
+    marginBottom: theme.spacing.s,
+  },
+  goalProgressBarBackground: {
+    height: 6,
+    backgroundColor: theme.colors.borderLight,
+    borderRadius: theme.borderRadius.s,
+    marginBottom: theme.spacing.xs,
+    overflow: 'hidden',
+  },
+  goalProgressBarFill: {
+    height: '100%',
+    borderRadius: theme.borderRadius.s,
+  },
+  goalProgressText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  goalCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goalStatsText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textLight,
+  },
+  goalStatusText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  addGoalCard: {
+    borderStyle: 'dashed',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addGoalContent: {
+    alignItems: 'center',
+  },
+  addGoalText: {
+    fontSize: theme.typography.fontSize.body2,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.primary,
+    marginTop: theme.spacing.s,
+  },
+  addGoalSubtext: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
 

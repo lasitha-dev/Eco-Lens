@@ -20,6 +20,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuthLogin';
 import SearchAnalyticsDashboard from '../../components/SearchAnalyticsDashboard';
+import NotificationBell from '../../components/NotificationBell';
+import NotificationList from '../../components/NotificationList';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 
@@ -49,6 +51,7 @@ const ProfileScreen = ({ navigation }) => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSearchAnalytics, setShowSearchAnalytics] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
 
 
   // Handle logout with confirmation
@@ -108,12 +111,12 @@ const ProfileScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('OrderHistory'),
     },
     {
-      id: 'sustainability',
-      title: 'Sustainability Impact',
-      subtitle: 'Track your eco-friendly choices',
-      icon: '🌱',
+      id: 'sustainability_goals',
+      title: 'Sustainability Goals',
+      subtitle: 'Set and track your eco-friendly targets',
+      icon: '🎯',
       iconColor: '#66BB6A',
-      onPress: () => Alert.alert('Coming Soon', 'Sustainability tracking will be available in a future update.'),
+      onPress: () => navigation.navigate('SustainabilityGoals'),
     },
   ];
 
@@ -141,6 +144,16 @@ const ProfileScreen = ({ navigation }) => {
         barStyle="dark-content" 
         backgroundColor={theme.colors.background}
       />
+      
+      {/* Header with notification bell */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <NotificationBell
+          onPress={() => setNotificationModalVisible(true)}
+          iconSize={24}
+          iconColor={theme.colors.text}
+        />
+      </View>
       
       <ScrollView 
         style={styles.content}
@@ -210,6 +223,25 @@ const ProfileScreen = ({ navigation }) => {
           onClose={() => setShowSearchAnalytics(false)}
         />
       </Modal>
+
+      {/* Notification Modal */}
+      <NotificationList
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+        onNotificationPress={(notification) => {
+          setNotificationModalVisible(false);
+          if (notification.goalId) {
+            // Handle both object and string goalId
+            const goalId = typeof notification.goalId === 'object' 
+              ? notification.goalId?._id || notification.goalId?.id
+              : notification.goalId;
+            
+            if (goalId) {
+              navigation.navigate('GoalProgress', { goalId });
+            }
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -218,6 +250,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
   },
   
   content: {

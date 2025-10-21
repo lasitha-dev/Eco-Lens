@@ -10,16 +10,20 @@ import SignUpScreen from '../screens/SignUpScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CustomerTabNavigator from './CustomerTabNavigator';
 import AdminDashboard from '../screens/AdminDashboard';
+import AdminSettingsScreen from '../screens/AdminSettingsScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import OnboardingSurvey from '../screens/OnboardingSurvey';
-import GoogleAuthCallbackScreen from '../screens/GoogleAuthCallbackScreen';
 import OrderHistoryScreen from '../screens/customer/OrderHistoryScreen';
 import OrderDetailsScreen from '../screens/customer/OrderDetailsScreen';
 import PaymentDetailsScreen from '../screens/customer/PaymentDetailsScreen';
 import PaymentReviewScreen from '../screens/customer/PaymentReviewScreen';
+import SustainabilityGoalsScreen from '../screens/customer/SustainabilityGoalsScreen';
+import GoalSetupScreen from '../screens/customer/GoalSetupScreen';
+import GoalProgressScreen from '../screens/customer/GoalProgressScreen';
+import ProductReviewsScreen from '../screens/customer/ProductReviewsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +52,7 @@ const AppNavigator = () => {
           // Admin screens
           <>
             <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+            <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
           </>
         ) : (
           // Customer screens
@@ -61,6 +66,12 @@ const AppNavigator = () => {
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} />
             <Stack.Screen name="PaymentReview" component={PaymentReviewScreen} />
+            {/* Sustainability Goals Screens */}
+            <Stack.Screen name="SustainabilityGoals" component={SustainabilityGoalsScreen} />
+            <Stack.Screen name="GoalSetup" component={GoalSetupScreen} />
+            <Stack.Screen name="GoalProgress" component={GoalProgressScreen} />
+            {/* Product Reviews Screen */}
+            <Stack.Screen name="ProductReviews" component={ProductReviewsScreen} />
           </>
         )
       ) : (
@@ -71,7 +82,6 @@ const AppNavigator = () => {
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          <Stack.Screen name="GoogleAuthCallback" component={GoogleAuthCallbackScreen} />
         </>
       )}
     </Stack.Navigator>

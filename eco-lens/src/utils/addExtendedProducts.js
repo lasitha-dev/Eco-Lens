@@ -4,9 +4,9 @@
  */
 
 import { EXTENDED_MOCK_PRODUCTS } from './extendedMockData.js';
+import { API_BASE_URL } from '../config/api';
 
-// API configuration
-const API_BASE_URL = 'http://localhost:5000/api'; // Adjust if your backend runs on different port
+// API configuration is now imported from config/api.js
 
 // Function to add products to database
 export const addExtendedProductsToDatabase = async (authToken) => {

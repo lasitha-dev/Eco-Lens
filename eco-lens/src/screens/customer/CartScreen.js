@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -22,32 +23,117 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import theme from '../../styles/theme';
 import globalStyles from '../../styles/globalStyles';
 import EcoGradeBadge from '../../components/product/EcoGradeBadge';
+import SustainabilityGoalService from '../../api/sustainabilityGoalService';
+import { useRealtimeGoals } from '../../contexts/RealtimeGoalContext';
 import { useAuth } from '../../hooks/useAuthLogin';
 import { API_BASE_URL } from '../../config/api';
+import AuthService from '../../api/authService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const CartScreen = ({ navigation }) => {
-  const { user, auth: token } = useAuth();
+  const { user, auth: token, updateUser } = useAuth();
+  
+  // Fetch complete user profile from database on mount
+  useEffect(() => {
+    const fetchCompleteProfile = async () => {
+      try {
+        console.log('🔄 Fetching complete user profile from database...');
+        const completeProfile = await AuthService.fetchUserProfile();
+        console.log('✅ Fetched profile:', {
+          address: completeProfile.address,
+          country: completeProfile.country,
+          phone: completeProfile.phone
+        });
+        // Update user context with complete profile data
+        await updateUser(completeProfile);
+      } catch (error) {
+        console.error('❌ Error fetching complete profile:', error);
+      }
+    };
+    
+    if (token) {
+      fetchCompleteProfile();
+    }
+  }, [token]); // Run when token is available
+  
+  // Use real-time goals context
+  const { 
+    activeGoals, 
+    validateCartAgainstGoals,
+    trackPurchaseProgress 
+  } = useRealtimeGoals();
+  // Cart state
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
   
+  // Real-time goal validation (computed from context)
+  const goalValidation = validateCartAgainstGoals(cartItems);
+  
   // Shipping address form - prepopulate with user data
   const [shippingAddress, setShippingAddress] = useState({
-    fullName: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : '',
-    addressLine1: user?.address || '',
+    fullName: '',
+    addressLine1: '',
     addressLine2: '',
-    city: user?.city || '',
-    state: user?.state || '',
-    postalCode: user?.postalCode || user?.zipCode || '',
-    country: user?.country || '',
-    phone: user?.phone || user?.phoneNumber || '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: '',
+    phone: '',
   });
+  
+  const [validationErrors, setValidationErrors] = useState({});
+
+  // Update shipping address when user data loads
+  useEffect(() => {
+    if (user) {
+      const fullName = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : '';
+      const address = user.address && user.address !== 'Not provided' ? user.address : '';
+      const country = user.country && user.country !== 'Not provided' ? user.country : '';
+      const phone = user.phone || '';
+      
+      setShippingAddress({
+        fullName,
+        addressLine1: address,
+        addressLine2: '',
+        city: '', // Not in User model - user needs to fill
+        state: '', // Not in User model - user needs to fill
+        postalCode: '', // Not in User model - user needs to fill
+        country,
+        phone,
+      });
+    }
+  }, [user]);
+  
+  // Countries list for dropdown (matches registration form)
+  const countries = [
+    'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
+    'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+    'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia',
+    'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
+    'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Democratic Republic of the Congo', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador',
+    'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
+    'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau',
+    'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland',
+    'Israel', 'Italy', 'Ivory Coast', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait',
+    'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+    'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
+    'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru',
+    'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman',
+    'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal',
+    'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+    'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia',
+    'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+    'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey',
+    'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu',
+    'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
+  ];
 
   // Fetch cart from API
   const fetchCart = async () => {
@@ -93,13 +179,18 @@ const CartScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    fetchCart();
-  }, []);
+  // Reload cart whenever screen is focused (fixes issue where added items don't show immediately)
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+      // Goals are now automatically loaded by the RealtimeGoalProvider
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchCart();
+    // Goals are automatically refreshed by the RealtimeGoalProvider
   }, []);
 
   // Function to update item quantity with optimistic updates
@@ -232,81 +323,142 @@ const CartScreen = ({ navigation }) => {
     });
   };
 
-  // Validate shipping address
+  // Validate shipping address with detailed error tracking
   const validateShippingAddress = () => {
+    const errors = {};
+    
+    // Full name validation
     if (!shippingAddress.fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return false;
+      errors.fullName = 'Full name is required';
+    } else if (shippingAddress.fullName.trim().length < 2) {
+      errors.fullName = 'Name must be at least 2 characters';
     }
+    
+    // Address validation
     if (!shippingAddress.addressLine1.trim()) {
-      Alert.alert('Error', 'Please enter your address');
-      return false;
+      errors.addressLine1 = 'Address is required';
+    } else if (shippingAddress.addressLine1.trim().length < 5) {
+      errors.addressLine1 = 'Please enter a complete address';
     }
+    
+    // City validation
     if (!shippingAddress.city.trim()) {
-      Alert.alert('Error', 'Please enter your city');
-      return false;
+      errors.city = 'City is required';
     }
+    
+    // Postal code validation
     if (!shippingAddress.postalCode.trim()) {
-      Alert.alert('Error', 'Please enter your postal code');
+      errors.postalCode = 'Postal code is required';
+    } else if (shippingAddress.postalCode.trim().length < 3) {
+      errors.postalCode = 'Invalid postal code';
+    }
+    
+    // Country validation
+    if (!shippingAddress.country) {
+      errors.country = 'Country is required';
+    }
+    
+    // Phone validation (optional but must be valid if provided)
+    if (shippingAddress.phone.trim() && shippingAddress.phone.trim().length < 10) {
+      errors.phone = 'Please enter a valid phone number';
+    }
+    
+    setValidationErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      // Show first error
+      const firstError = Object.values(errors)[0];
+      Alert.alert('Validation Error', firstError);
       return false;
     }
-    if (!shippingAddress.country.trim()) {
-      Alert.alert('Error', 'Please enter your country');
-      return false;
-    }
+    
     return true;
   };
 
 
   // Render cart item
-  const renderCartItem = ({ item }) => (
-    <View style={styles.cartItem}>
-      <Image source={{ uri: item.image }} style={styles.itemImage} />
-      
-      <View style={styles.itemDetails}>
-        <View style={styles.itemHeader}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {item.name}
+  const renderCartItem = ({ item }) => {
+    const itemGoalValidation = goalValidation[item.id];
+    
+    return (
+      <View style={styles.cartItem}>
+        <Image source={{ uri: item.image }} style={styles.itemImage} />
+        
+        <View style={styles.itemDetails}>
+          <View style={styles.itemHeader}>
+            <Text style={styles.itemName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={styles.itemBadges}>
+              <EcoGradeBadge grade={item.sustainabilityGrade} size="small" />
+              {itemGoalValidation && (
+                <View style={[
+                  styles.goalIndicator,
+                  { backgroundColor: itemGoalValidation.meetsAnyGoal ? theme.colors.success + '20' : theme.colors.warning + '20' }
+                ]}>
+                  <Text style={[
+                    styles.goalIndicatorText,
+                    { color: itemGoalValidation.meetsAnyGoal ? theme.colors.success : theme.colors.warning }
+                  ]}>
+                    {itemGoalValidation.meetsAnyGoal ? '✓' : '!'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+          
+          <Text style={styles.itemCategory}>{item.category}</Text>
+          <Text style={styles.itemPrice}>${item.price.toFixed(2)} each</Text>
+          
+          {/* Goal Validation Info */}
+          {itemGoalValidation && activeGoals.length > 0 && (
+            <View style={styles.goalValidationContainer}>
+              {itemGoalValidation.meetsAnyGoal ? (
+                <Text style={styles.goalValidationText}>
+                  ✅ Meets {itemGoalValidation.matchingGoals.length} goal{itemGoalValidation.matchingGoals.length !== 1 ? 's' : ''}
+                </Text>
+              ) : (
+                <Text style={styles.goalValidationTextWarning}>
+                  ⚠️ Doesn't meet sustainability goals
+                </Text>
+              )}
+            </View>
+          )}
+          
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => updateQuantity(item.id, item.quantity - 1)}
+            >
+              <Text style={styles.quantityButtonText}>-</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.quantityText}>{item.quantity}</Text>
+            
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => updateQuantity(item.id, item.quantity + 1)}
+            >
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => removeItem(item.id)}
+            >
+              <Text style={styles.removeButtonText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.itemTotal}>
+          <Text style={styles.itemTotalText}>
+            ${(item.price * item.quantity).toFixed(2)}
           </Text>
-          <EcoGradeBadge grade={item.sustainabilityGrade} size="small" />
-        </View>
-        
-        <Text style={styles.itemCategory}>{item.category}</Text>
-        <Text style={styles.itemPrice}>${item.price.toFixed(2)} each</Text>
-        
-        <View style={styles.quantityContainer}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
-          >
-            <Text style={styles.quantityButtonText}>-</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity + 1)}
-          >
-            <Text style={styles.quantityButtonText}>+</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => removeItem(item.id)}
-          >
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </TouchableOpacity>
         </View>
       </View>
-      
-      <View style={styles.itemTotal}>
-        <Text style={styles.itemTotalText}>
-          ${(item.price * item.quantity).toFixed(2)}
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   // Render empty cart
   const renderEmptyCart = () => (
@@ -383,7 +535,7 @@ const CartScreen = ({ navigation }) => {
           <FlatList
             data={cartItems}
             renderItem={renderCartItem}
-            keyExtractor={(item) => `${item.id}-${item.quantity}`}
+            keyExtractor={(item, index) => `${item?.id || item?._id || `item-${index}`}-${item.quantity}`}
             contentContainerStyle={styles.cartList}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -418,6 +570,30 @@ const CartScreen = ({ navigation }) => {
               </View>
             </View>
             
+            {/* Goal Compliance Summary */}
+            {goalValidation._summary && activeGoals.length > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Goal Compliance:</Text>
+                <View style={styles.goalComplianceContainer}>
+                  <Text style={[
+                    styles.summaryValue, 
+                    { 
+                      color: goalValidation._summary.overallCompliance >= 70 
+                        ? theme.colors.success 
+                        : goalValidation._summary.overallCompliance >= 40 
+                          ? theme.colors.warning 
+                          : theme.colors.error 
+                    }
+                  ]}>
+                    {goalValidation._summary.itemsMeetingAnyGoal}/{goalValidation._summary.totalItems} items
+                  </Text>
+                  <Text style={styles.goalCompliancePercent}>
+                    ({Math.round((goalValidation._summary.itemsMeetingAnyGoal / goalValidation._summary.totalItems) * 100)}%)
+                  </Text>
+                </View>
+              </View>
+            )}
+            
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total:</Text>
               <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
@@ -444,34 +620,63 @@ const CartScreen = ({ navigation }) => {
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>Shipping Address</Text>
+              <Text style={styles.modalSubtitle}>
+                Some fields are pre-filled from your profile. Please complete the remaining details.
+              </Text>
               
               <TextInput
-                style={styles.input}
+                style={[styles.input, validationErrors.fullName && styles.inputError]}
                 placeholder="Full Name *"
                 value={shippingAddress.fullName}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, fullName: text })}
+                onChangeText={(text) => {
+                  setShippingAddress({ ...shippingAddress, fullName: text });
+                  if (validationErrors.fullName) {
+                    setValidationErrors({ ...validationErrors, fullName: null });
+                  }
+                }}
               />
+              {validationErrors.fullName && (
+                <Text style={styles.errorText}>{validationErrors.fullName}</Text>
+              )}
               
               <TextInput
-                style={styles.input}
-                placeholder="Address Line 1 *"
+                style={[styles.input, styles.addressInput, validationErrors.addressLine1 && styles.inputError]}
+                placeholder="Address Line 1 (Street, Building) *"
                 value={shippingAddress.addressLine1}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, addressLine1: text })}
+                onChangeText={(text) => {
+                  setShippingAddress({ ...shippingAddress, addressLine1: text });
+                  if (validationErrors.addressLine1) {
+                    setValidationErrors({ ...validationErrors, addressLine1: null });
+                  }
+                }}
+                multiline
+                numberOfLines={2}
               />
+              {validationErrors.addressLine1 && (
+                <Text style={styles.errorText}>{validationErrors.addressLine1}</Text>
+              )}
               
               <TextInput
-                style={styles.input}
-                placeholder="Address Line 2 (Optional)"
+                style={[styles.input, styles.addressInput]}
+                placeholder="Address Line 2 (Apt/Unit - Optional)"
                 value={shippingAddress.addressLine2}
                 onChangeText={(text) => setShippingAddress({ ...shippingAddress, addressLine2: text })}
               />
               
               <TextInput
-                style={styles.input}
+                style={[styles.input, validationErrors.city && styles.inputError]}
                 placeholder="City *"
                 value={shippingAddress.city}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, city: text })}
+                onChangeText={(text) => {
+                  setShippingAddress({ ...shippingAddress, city: text });
+                  if (validationErrors.city) {
+                    setValidationErrors({ ...validationErrors, city: null });
+                  }
+                }}
               />
+              {validationErrors.city && (
+                <Text style={styles.errorText}>{validationErrors.city}</Text>
+              )}
               
               <TextInput
                 style={styles.input}
@@ -481,26 +686,56 @@ const CartScreen = ({ navigation }) => {
               />
               
               <TextInput
-                style={styles.input}
+                style={[styles.input, validationErrors.postalCode && styles.inputError]}
                 placeholder="Postal Code *"
                 value={shippingAddress.postalCode}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, postalCode: text })}
+                onChangeText={(text) => {
+                  setShippingAddress({ ...shippingAddress, postalCode: text });
+                  if (validationErrors.postalCode) {
+                    setValidationErrors({ ...validationErrors, postalCode: null });
+                  }
+                }}
               />
+              {validationErrors.postalCode && (
+                <Text style={styles.errorText}>{validationErrors.postalCode}</Text>
+              )}
+              
+              <View style={[styles.pickerContainer, validationErrors.country && styles.inputError]}>
+                <Picker
+                  selectedValue={shippingAddress.country}
+                  onValueChange={(itemValue) => {
+                    setShippingAddress({ ...shippingAddress, country: itemValue });
+                    if (validationErrors.country) {
+                      setValidationErrors({ ...validationErrors, country: null });
+                    }
+                  }}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Country *" value="" />
+                  {countries.map((country) => (
+                    <Picker.Item key={country} label={country} value={country} />
+                  ))}
+                </Picker>
+              </View>
+              {validationErrors.country && (
+                <Text style={styles.errorText}>{validationErrors.country}</Text>
+              )}
               
               <TextInput
-                style={styles.input}
-                placeholder="Country *"
-                value={shippingAddress.country}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, country: text })}
-              />
-              
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
+                style={[styles.input, validationErrors.phone && styles.inputError]}
+                placeholder="Phone Number (Optional)"
                 value={shippingAddress.phone}
-                onChangeText={(text) => setShippingAddress({ ...shippingAddress, phone: text })}
+                onChangeText={(text) => {
+                  setShippingAddress({ ...shippingAddress, phone: text });
+                  if (validationErrors.phone) {
+                    setValidationErrors({ ...validationErrors, phone: null });
+                  }
+                }}
                 keyboardType="phone-pad"
               />
+              {validationErrors.phone && (
+                <Text style={styles.errorText}>{validationErrors.phone}</Text>
+              )}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
@@ -514,7 +749,7 @@ const CartScreen = ({ navigation }) => {
                   style={[styles.modalButton, styles.confirmButton]}
                   onPress={proceedToPayment}
                 >
-                  <Text style={styles.confirmButtonText}>Continue to Payment</Text>
+                  <Text style={styles.confirmButtonText}>Continue</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -836,8 +1071,16 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.h4,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text,
-    marginBottom: theme.spacing.l,
+    marginBottom: theme.spacing.s,
     textAlign: 'center',
+  },
+
+  modalSubtitle: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.l,
+    fontStyle: 'italic',
   },
 
   input: {
@@ -848,6 +1091,38 @@ const styles = StyleSheet.create({
     padding: theme.spacing.m,
     marginBottom: theme.spacing.m,
     fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.text,
+  },
+
+  inputError: {
+    borderColor: theme.colors.error,
+    borderWidth: 2,
+  },
+
+  errorText: {
+    color: theme.colors.error,
+    fontSize: theme.typography.fontSize.caption,
+    marginTop: -theme.spacing.s,
+    marginBottom: theme.spacing.m,
+    marginLeft: theme.spacing.xs,
+  },
+
+  addressInput: {
+    minHeight: 80,
+    paddingTop: theme.spacing.m,
+  },
+
+  pickerContainer: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.m,
+    marginBottom: theme.spacing.m,
+    overflow: 'hidden',
+  },
+
+  picker: {
+    height: 50,
     color: theme.colors.text,
   },
 
@@ -886,6 +1161,47 @@ const styles = StyleSheet.create({
     color: theme.colors.textOnPrimary,
     fontSize: theme.typography.fontSize.body1,
     fontWeight: theme.typography.fontWeight.bold,
+  },
+
+  // Goal Validation Styles
+  itemBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: theme.spacing.xs,
+  },
+  goalIndicatorText: {
+    fontSize: theme.typography.fontSize.caption,
+    fontWeight: theme.typography.fontWeight.bold,
+  },
+  goalValidationContainer: {
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+  },
+  goalValidationText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.success,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  goalValidationTextWarning: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.warning,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  goalComplianceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalCompliancePercent: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.xs,
   },
 });
 

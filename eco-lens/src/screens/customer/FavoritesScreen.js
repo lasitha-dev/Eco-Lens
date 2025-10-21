@@ -296,6 +296,7 @@ const FavoritesScreen = ({ navigation }) => {
         product={selectedProduct}
         onClose={handleModalClose}
         onAddToCart={handleAddToCart}
+        navigation={navigation}
       />
 
       {/* Cart Toast Notification */}

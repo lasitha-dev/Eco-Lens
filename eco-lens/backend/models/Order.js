@@ -142,7 +142,7 @@ orderSchema.pre('save', function(next) {
 
 // Index for efficient querying
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 });
+// Note: orderNumber index is automatically created by unique: true constraint (line 73)
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ paymentStatus: 1 });
 
