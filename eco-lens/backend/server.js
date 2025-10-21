@@ -25,15 +25,32 @@ const PORT = process.env.PORT || 5002;
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:8081',  // Expo dev server
-    'http://localhost:19006', // Expo web
-    'http://localhost:5002',  // Backend itself
-    'http://192.168.8.143:8081', // Mobile network IP
-    'http://192.168.8.143:19006', // Web network IP
-    'http://10.38.245.146:8081', // Mobile network IP (alternate)
-    'http://10.38.245.146:19006' // Web network IP (alternate)
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:8081',  // Expo dev server
+      'http://localhost:19006', // Expo web
+      'http://localhost:5002',  // Backend itself
+      'http://192.168.8.143:8081', // Mobile network IP
+      'http://192.168.8.143:19006', // Web network IP
+      'http://10.38.245.146:8081', // Mobile network IP (alternate)
+      'http://10.38.245.146:19006', // Web network IP (alternate)
+      'https://eco-lens-8bn1.onrender.com' // Production backend
+    ];
+    
+    // Allow Expo Go app URLs (expo.dev domains)
+    if (origin.includes('expo.dev') || origin.includes('expo.io')) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins in production for mobile apps
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 }));
