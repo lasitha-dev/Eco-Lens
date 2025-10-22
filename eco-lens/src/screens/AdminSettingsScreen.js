@@ -115,16 +115,8 @@ const AdminSettingsScreen = ({ navigation }) => {
         return;
       }
 
-      // Save to backend
-      const response = await fetch(`${AuthService.API_BASE_URL || 'http://10.38.245.146:5002/api'}/profile/fingerprint-settings`, {
-        method: 'PATCH',
-        headers: await AuthService.getAuthHeaders(),
-        body: JSON.stringify({ fingerprintEnabled: true })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update settings on server');
-      }
+      // Save to backend using AuthService method
+      await AuthService.updateFingerprintSetting(true);
 
       // Store credentials locally
       const email = getUserEmail();
@@ -138,7 +130,7 @@ const AdminSettingsScreen = ({ navigation }) => {
 
     } catch (error) {
       console.error('Error enabling biometric:', error);
-      Alert.alert('Error', 'Failed to enable biometric authentication. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to enable biometric authentication. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -157,16 +149,8 @@ const AdminSettingsScreen = ({ navigation }) => {
             try {
               setIsSaving(true);
 
-              // Save to backend
-              const response = await fetch(`${AuthService.API_BASE_URL || 'http://10.38.245.146:5002/api'}/profile/fingerprint-settings`, {
-                method: 'PATCH',
-                headers: await AuthService.getAuthHeaders(),
-                body: JSON.stringify({ fingerprintEnabled: false })
-              });
-
-              if (!response.ok) {
-                throw new Error('Failed to update settings on server');
-              }
+              // Save to backend using AuthService method
+              await AuthService.updateFingerprintSetting(false);
 
               // Clear local credentials
               await BiometricAuthService.disableBiometric();
@@ -176,7 +160,7 @@ const AdminSettingsScreen = ({ navigation }) => {
 
             } catch (error) {
               console.error('Error disabling biometric:', error);
-              Alert.alert('Error', 'Failed to disable biometric authentication. Please try again.');
+              Alert.alert('Error', error.message || 'Failed to disable biometric authentication. Please try again.');
             } finally {
               setIsSaving(false);
             }
